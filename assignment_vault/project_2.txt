@@ -1,0 +1,289 @@
+RAG for Codebases (15%)
+Deliverables due Thu Mar 20th 8:00am
+Demo and presentation in class on Thu Mar 20th
+
+Project Overview: In this assignment, you will build a Retrieval-Augmented Generation (RAG) system tailored for exploring and querying large codebases. The project involves indexing two different codebases and implementing a question-answering system that retrieves relevant code snippets to assist a language model in generating informed answers. You will start with a basic RAG pipeline using LlamaIndex and ChromaDB, then experiment with advanced chunking and metadata strategies to improve retrieval performance. The assignment covers background concepts, implementation steps, and evaluation criteria, ensuring you understand both the why and how of each component.
+Background Information
+Retrieval-Augmented Generation (RAG)
+
+RAG is a technique that combines information retrieval with generative AI, allowing a language model to fetch relevant external knowledge before answering a query. Instead of relying solely on its trained internal knowledge, the model is “augmented” with facts or data retrieved from a provided document set​ (en.wikipedia.org/Retrieval-augmented_genertion). In practice, a RAG system indexes a knowledge source (e.g. documentation or code) into a searchable form. When a user asks a question, the system first retrieves the most relevant pieces of information, then augments the model’s input with these pieces so that the generation (the model’s answer) can reference them. This approach helps the model give up-to-date, specific answers and greatly reduces hallucinations (confident but incorrect answers)​.
+
+How RAG Works: At a high level, implementing RAG involves a few key steps​:
+
+    Indexing Data – Split the source documents into manageable chunks and convert each chunk into a numeric embedding (a vector representation of the text’s meaning).
+    Storing Embeddings – Save these embeddings in a vector database along with metadata (like which document or section it came from). Vector databases (like ChromaDB) enable fast similarity search for high-dimensional vectors​ (datacamp.com - ChomaDB).
+    Retrieval – For each user query, convert the query into an embedding and find the nearest matching vectors (chunks) in the database. This returns the most semantically relevant code sections or documents for the query​.
+    Augmentation & Generation – Provide the retrieved text chunks as context to the LLM alongside the query. The LLM will use both the query and the retrieved code context to generate a detailed answer​.
+
+By following this pipeline, the generative model can cite specific code snippets or explanations from the repository, building user trust and improving accuracy.
+
+blog.lancedb.com - RAG Codebase Tutorial
+Embeddings and Vector Databases
+
+Embeddings are numerical representations of text (or code) in a high-dimensional space, where semantically similar texts end up near each other. In this project, you will use an embedding model (e.g. from LlamaIndex’s integration with OpenAI or a local model) to convert code snippets into embedding vectors. These vectors capture the meaning and context of the code, allowing semantic comparison beyond simple keyword matching. For example, two functions with similar functionality will ideally have embeddings that are close in vector space, even if they don’t share exact keywords.
+
+A vector database stores these embeddings and supports similarity search. We will use ChromaDB as the vector store. ChromaDB is an open-source vector database designed for AI applications – it can efficiently store millions of embedding vectors along with metadata and quickly retrieve the top-k nearest neighbors for a given query vector​. In other words, Chroma will allow us to ask “Which code chunk is most similar to this query embedding?” and get back the relevant code pieces in milliseconds. By including metadata (like filenames or line numbers) in the stored entries, we can also filter or organize results easily. The combination of embeddings + vector DB forms the “memory” of our RAG system, enabling semantic code search as the backbone of retrieval.
+Code Chunking Strategies
+
+Dividing source code into chunks is a critical step in making our codebase searchable. Unlike plain text, code has structural elements (functions, classes, modules) that we want to preserve when chunking. Naively splitting code every N lines or characters can break logical units and harm retrieval quality​. The goal is to chunk code in a way that each chunk is a self-contained, meaningful unit (e.g. a function definition, a class, or a logical code block) – this maintains semantic integrity and ensures the embeddings capture meaningful context.
+
+Several strategies and tools can be used for code chunking:
+
+    AST-Based Chunking (LlamaIndex CodeSplitter) – LlamaIndex provides a CodeSplitter that uses a language’s syntax to split code. Internally, this leverages a parser (Tree-sitter) to generate an Abstract Syntax Tree (AST) of the code and splits along node boundaries (such as function or class definitions)​ docs.sweep.dev - chunking improvements. This means chunks will align with natural code units (e.g. each function becomes a chunk), which is ideal since “code files are best chunked and vectorized as whole functions or classes.” The CodeSplitter supports many languages out-of-the-box (Python, C, JavaScript, etc.) and allows customizing chunk size (e.g. max lines or characters per chunk) and overlap​ restack.io - LlamaIndex CodeSplitter. Using the CodeSplitter for our baseline ensures that the code is tokenized into coherent pieces that an LLM can understand in isolation without losing too much context. (For instance, if a function is 80 lines long, it might be split into two overlapping chunks of 50 lines each, rather than cutting arbitrarily in the middle of a loop.) This AST-driven approach is LlamaIndex’s default for code because it preserves code structure in the chunks​.
+    Custom tree-sitter Approach – This is essentially similar to the above AST method in which we create a modified chunking strategy based on tree-sitter.It’s important to note that if the code is well-structured and parseable, this method yields high-quality chunks. However, if the code has syntax errors or uses an unsupported language, the AST parser might fail. In those cases, we need a fallback. We may need this customer approach to add additional metadata such as file path, function name, class name, and method name. As well as comments.
+    Language Server Protocol (LSP) Based Chunking – Another advanced strategy is to leverage language tooling (such as an LSP server or ctags) to identify symbols (functions, classes, methods) in the code and chunk based on those. Language servers (the same ones used by IDEs for features like “Go to Definition”) can provide a list of definitions or outline of a file. Using an LSP, one could programmatically obtain all function definitions and split the file accordingly. This approach tends to produce very clean, logical chunks (each chunk exactly a function or class), and can also yield rich metadata (like function name, signature, etc.). For example, using LSIF (Language Server Index Format) data — essentially an export of what an LSP knows about the code — is one way to extract a codebase’s structure for chunking​.. However, this method can be complex to set up for multiple languages and is beyond the scope of the built-in LlamaIndex tools. As an extension, you may explore using an LSP client or ctags for one of the codebases, but this is optional and more involved.
+    Fallback Chunking (Simple Split) – If structured chunking fails or isn’t available, a simpler strategy is to chunk code by length (e.g. fixed number of lines or characters with overlap) or by delimiters (e.g. blank lines). This ensures we can index all the code even if we can’t parse it. LlamaIndex’s CodeSplitter allows specifying chunk_lines and max_chars which effectively serve as a fallback when a single AST node is very large. In cases where an entire file is one big function or the AST cannot be generated, you can manually fall back to a plain text splitter (like splitting every 300 characters with 50 overlap, or using LlamaIndex’s RecursiveCharacterTextSplitter as a backup). Fallback chunks are not as semantically clean – they might start or end in the middle of a function – but they guarantee coverage of the codebase. In this project, part of the challenge is to observe how such less-ideal chunking affects retrieval performance compared to the AST-based approach.
+
+Each of these strategies has trade-offs in complexity and quality. The Baseline implementation will use the straightforward AST-based chunking via CodeSplitter. The Advanced extensions will give you a chance to tinker with alternative chunking or adding metadata to see how retrieval results change.
+Project Objectives
+
+This assignment has several objectives, progressing from a basic implementation to more advanced explorations:
+
+    Baseline RAG Implementation: Use LlamaIndex to index a codebase with its default code chunker. Specifically, utilize CodeSplitter to chunk the code, generate embeddings for each chunk, and store them in ChromaDB. Implement the end-to-end RAG pipeline: given a natural language query about the code, retrieve the most relevant code chunks from ChromaDB and feed them into an LLM to produce an answer. This baseline system should be functional for answering questions about the codebase.
+    Understanding Embeddings & Metadata: Ensure you include basic metadata for each chunk (at least the source file name and perhaps the originating line numbers). Even in the baseline, verify that you can trace back from an embedding result to the original file and location in the code. This will be important for answer citation or just understanding results.
+    Extended Chunking Approaches: Going beyond the baseline, experiment with different ways to chunk or index the code:
+        Different Chunk Contents: Vary what text gets embedded. For example, you might try including file path or function name in the text of the chunk (e.g., prepending the function signature or a comment indicating the file). Does adding this context to the embedding improve retrieval when queries mention a function name or file? Alternatively, consider splitting out or separating comments and docstrings: you could embed code and comments together vs. embedding only code without comments to see which yields better results for certain queries.
+        Metadata-Enhanced Retrieval: Store rich metadata for each chunk, such as { "file": "path/to/file.c", "start_line": 100, "end_line": 150, "function": "func_name" }. Modify the retrieval logic to use this metadata. For instance, if a query explicitly contains a file name or a function name, you could filter or boost results that match that metadata. One objective is to see how using metadata (beyond just the raw code text) can refine the quality of retrieved candidates.
+        Alternative Chunk Sizes: Try adjusting chunk size parameters or using a fallback splitter. For example, compare the default CodeSplitter (AST-based) with a simpler fixed-line splitter. Does a naive splitter (say, every 50 lines) miss important context or retrieve less relevant code compared to AST-based chunks? Conversely, does the AST splitter ever split things too coarsely or finely in a way that affects retrieval? By exploring this, you will deepen your understanding of why chunking strategy matters.
+    Comparison of Approaches: After implementing the variations above, evaluate and compare them. The primary objective is not only to build these systems but also to analyze how changes affect retrieval performance and answer quality. This means you will run the same set of queries on each variant of your system (baseline vs. each tweak) and record metrics and observations.
+    Application to Two Codebases: Apply your RAG system to two distinct open-source codebases: (1) xv6-riscv (MIT’s teaching operating system, in C) and (2) llama_index (the LlamaIndex project’s own code, in Python). By testing on both a low-level C codebase and a high-level Python codebase, you’ll see how your approach generalizes. The objective is to ensure your pipeline is not hard-coded to one language and to observe differences (e.g., Does the AST chunker handle C as well as Python? Do certain queries work better on one codebase vs the other?).
+    Realistic Query Handling: Aim to enable meaningful Q\&A over the code. For example, a user query on xv6 might be, “Where in the code is the process scheduler implemented?” or “What does the allocproc function do in xv6?”. On llama_index, a query could be “How does LlamaIndex load a Pandas dataframe?” or “Which class in llama_index handles vector database integration?”. The system should retrieve the relevant function or section of code and the LLM should use it to compose an answer (e.g., summarizing the function or pointing to the file and lines where something is defined). Formulating and testing with such queries is an objective to demonstrate your system’s usefulness.
+
+In summary, by the end of the project you should have: (a) a working RAG system that can answer questions about a codebase by retrieving code, and (b) insights from experimenting with chunking and metadata that show you understand how to improve (or why certain approaches fail).
+Codebase Selection
+
+We will evaluate the RAG system on two specific codebases to cover different languages and use cases:
+
+    xv6-riscv – xv6 is a simple Unix-like teaching operating system originally developed at MIT. It’s a modern re-implementation of Sixth Edition UNIX in ANSI C, targeted at RISC-V (and x86) architectures​. The entire OS codebase is compact (the printed source is about 99 pages​), making it feasible to index fully. Despite its size, xv6 contains key OS concepts (process scheduling, file systems, device drivers) implemented in C, which provides rich material for code queries. This codebase will test your system’s ability to handle C code with low-level details. Repository link: mit-pdos/xv6-riscv.
+    llama_index (LlamaIndex) – LlamaIndex (formerly GPT Index) is an open-source Python library that connects LLMs with external data by creating indices over that data​. It’s the very framework we are using in this project, so indexing its codebase is a bit meta! The llama_index repo (Python code) includes various modules for data connectors, index structures, and query engines. This will let you test the system on a high-level language (Python) and on code that is more object-oriented or abstract. Repository link: run-llama/llama_index.
+
+By choosing these two, you’ll get to see how the retrieval performs on systems code vs. library code, and on C vs. Python. Ensure your pipeline is parameterized by language so that you initialize the CodeSplitter with language="c" for xv6 and language="python" for LlamaIndex, for example. During evaluation, use separate indices (or even separate Chroma collections) for the two codebases to avoid any mixing of embeddings.
+
+Why these codebases? They are reasonably sized and familiar in their domains (xv6 is well-known in OS education, and LlamaIndex is popular in the LLM community). Both have adequate documentation and clear structure, which means you can also manually verify if your system retrieves the correct pieces. Additionally, xv6 being in C will test the multi-language support of LlamaIndex’s CodeSplitter (Tree-sitter has a C parser) and LlamaIndex being in Python will test it on a dynamic language. Observing differences, like how well the embedding model handles C code vs Python docstrings, could be an interesting outcome.
+Tools & Libraries
+
+You are required to use the following tools and libraries in your implementation:
+
+    Python: The programming language for writing your indexing and retrieval pipeline. You can use Python 3.8+ (make sure to manage virtual environments or requirements as needed). All data processing, index building, and evaluation will be done in Python.
+    LlamaIndex: This library will be the core framework you utilize for document parsing, chunking, and possibly for managing the prompt/LLM. Specifically, you will use LlamaIndex’s Node Parsers (like CodeSplitter) to chunk the code, and its embedding models interface to generate embeddings. You may also use LlamaIndex’s query engine components to assist in constructing prompts with retrieved context for the LLM. Familiarize yourself with LlamaIndex’s documentation on indices and node parsers​ (github.com - node parsers) – it provides high-level APIs to do a lot of the heavy lifting in RAG pipelines.
+    ChromaDB: The project’s vector database. Use ChromaDB to store your code embeddings and perform similarity search. Chroma can be used via its Python client (chromadb package). You’ll create a collection for each codebase, where each entry in the collection has: an embedding (vector), the text chunk, and metadata (like an ID, file name, etc.). LlamaIndex can directly interface with Chroma as a storage layer, or you can use Chroma’s API manually – both approaches are acceptable as long as you document them. Note: If using LlamaIndex’s VectorStoreIndex, you can likely configure it to use Chroma as the backend.
+    OpenAI or HuggingFace Embedding Models: While not a library to import per se, you will need an embedding model to convert code chunks into vectors. LlamaIndex supports OpenAI’s text embedding models (like text-embedding-ada-002) and also open-source models (for example, via sentence-transformers). You should use at least one embedding model consistently for comparison. (If using OpenAI API, mind the rate limits and costs; if using a local model from HuggingFace, ensure it’s one known to work well for code, such as codebert-base or other code specialized models, if available.)
+    LLM for Generation: To actually perform the “augmented generation” and answer questions, you’ll need an LLM. This could be an OpenAI GPT-4/GPT-3.5 model, or a local model like LLaMA 2, etc., depending on what’s available in your environment. LlamaIndex makes it easy to plug in an LLM for query response generation. The choice of model isn’t the focus of this assignment (you can use the same model for all tests), but ensure you have something that can accept the retrieved context and produce a coherent answer. The emphasis is on retrieval quality, so a simpler model is fine as long as it can follow instructions to use the provided context.
+
+Important: Using the specified tools is part of the requirements. You should not, for example, use an alternative vector database (like Pinecone or FAISS) or a completely different framework (like LangChain) for the core implementation – though you can certainly mention them in your report or try them out for your own learning, the expectation is to gain experience with LlamaIndex and Chroma specifically. Both are industry-relevant (LlamaIndex is widely used for RAG, and Chroma is a popular open-source vector store), so this experience will be valuable. If you face issues with these libraries, reach out to the instructors or TAs for guidance rather than switching tools.
+Project Deliverables
+
+By the end of the assignment, you should submit a comprehensive package containing the following:
+
+    Code Implementation: All source code written for this project. This should include scripts or notebooks for:
+        Indexing each codebase (reading files, chunking, embedding, and storing in ChromaDB).
+        Running queries against the RAG system (retrieving relevant chunks and generating answers).
+        Any evaluation scripts used to calculate metrics.
+        Ensure your code is well-organized (you may separate indexing and querying into different modules or notebooks). Include clear instructions on how to run the code in a README.md or in comments, especially if there are any setup steps (like needing API keys for OpenAI, or installing specific versions of libraries). Code should be documented and commented where non-obvious. We will run your code on a fresh environment, so provide any requirements files (requirements.txt or environment.yml) needed to install dependencies.
+    Documentation: A written report or documentation file explaining your project. This should be in a clear, structured format (could be a PDF report or a markdown file). The documentation should include:
+        An Introduction summarizing the project and your approach.
+        The Methodology detailing how you implemented the baseline and each extended approach. Explain how you used LlamaIndex and Chroma, what embedding model you chose, and how you performed chunking. If you implemented multiple strategies, clearly delineate them (perhaps with subsections).
+        The Results of your experiments. This includes the metrics (Precision@K, Recall, etc.) for each approach on the test queries, as well as qualitative observations (for example, you might include a couple of example queries and show what the baseline retrieved vs. what an improved version retrieved, and discuss the differences).
+        A discussion of Insights and Analysis: What did you learn about RAG for code? For instance, you might note “Including file path in the embedding text helped disambiguate functions with the same name in different files, improving precision for those queries.” Or perhaps “The AST-based splitter sometimes failed on one file due to a syntax issue, but our fallback ensured that file was still indexed, albeit in a less structured way.” Discuss any surprising findings or confirm if your results aligned with expectations from the background research.
+        Challenges and Limitations: Briefly note if you encountered any challenges (e.g., embedding model limitations with code, performance issues with Chroma on large embeddings, etc.) and how you addressed them. Also mention any limitations in your current system (e.g., it might not handle very large files due to memory, or the LLM sometimes still gives an incorrect answer even if retrieval was good – and speculate why).
+    Comparative Analysis: As part of the documentation (or a separate section), include a clear comparison of the different approaches you tried. A table might be helpful here, listing each variant (Baseline vs. Experiment 1 vs. Experiment 2, etc.) and their performance metrics, along with brief notes. Ensure you compare retrieval quality (and if applicable, end-to-end QA quality). If one approach didn’t work as expected, it’s okay to mention that (failed experiments are informative too). The goal is to show you didn’t just build one system, but you investigated the design space and have evidence to back conclusions on what works best.
+    Test Queries and Outputs: Provide the list of test queries you used for each codebase (at least 10 per codebase, as required). This can be in the documentation appendix or a separate file. For each query, you should also include the expected answer or at least the relevant code location (so we know what “ground truth” you had in mind to judge relevancy). If you wrote specific questions whose answers you knew (or could look up), mention those expected answers. For example: Query: “Which function in xv6 is responsible for scheduling processes?” – Expected: “The scheduler is implemented in kernel/proc.c, in the scheduler() function​.” This will help us (and you) evaluate whether the system retrieved the correct code. You should also include a couple of example run outputs (the actual answer your system gave, possibly with the retrieved snippet or source reference). This showcases your system’s capabilities.
+
+In summary, your deliverables are code + documentation/report. They should collectively demonstrate a working solution and your understanding of the problem. Make sure everything is clearly labeled and easy to follow. We should be able to read your report and understand what you did and then run your code to reproduce the key results.
+Evaluation Plan
+
+Your project will be evaluated on both functionality and analysis. Below is the breakdown of the evaluation criteria and what we expect:
+Correctness & Functionality (40%)
+
+    Indexing and Retrieval Correctness: Does your system correctly ingest the codebases and allow querying? We will run a few sample queries on each codebase using your submitted code. The system should retrieve reasonable code snippets for these queries (they don’t have to be perfect, but for example, a question about “process scheduling” in xv6 should at least retrieve something from a scheduling-related function, not completely unrelated code). We’ll check that your ChromaDB indeed contains the expected number of embeddings (did you index all files?) and that queries run without errors.
+    Baseline Implementation: Full points if the baseline RAG (CodeSplitter + basic metadata) is implemented as specified and works for both codebases. This includes using LlamaIndex and ChromaDB as required. If you deviated (for example, used a custom chunker, or a different vector DB), make sure it’s well-justified; unapproved deviations may cost some points if they circumvent the learning goals.
+    Advanced Implementation: We expect at least one or two meaningful extensions beyond the baseline. This could be different chunking parameters, adding metadata, etc., as described in objectives. We will check that these are implemented (e.g., if you claim to include file path in embeddings, we might spot-check an embedding entry to see if the text indeed has the file path).
+
+Comparative Analysis & Results (30%)
+
+    Metrics: You should compute Precision@K and Recall for your retrieval results on the test queries. We will look for a clear definition and use of these metrics in your report:
+        Precision@K: Of the top-K results retrieved, how many were relevant? (Usually expressed as a percentage or fraction of relevant items in the top K.) For example, if a query’s top-5 results contained 4 relevant code chunks, Precision@5 = 0.8. We expect you to choose a K (or a few values of K) that make sense (K=3 or 5 is common for targeted code search). Higher precision means the retriever is returning mostly correct hits in its top results.
+        Recall: Out of all the relevant pieces in the whole codebase for a query, how many did the system retrieve in the top-K? If there were 5 functions that could answer a query and your top-5 got 3 of them, recall = 0.6. In code search, Recall can be tricky since there might be only one truly relevant function for a query. You can interpret recall in such cases as whether that one was present in the results. We mainly want to see that you considered not just precision (getting some relevant stuff) but also whether your system missed important things (low recall).
+        Relevancy Score: This is a more subjective measure – you might call it an average relevancy rating of the results or use Mean Reciprocal Rank (MRR) or Mean Average Precision (MAP). Essentially, did the most relevant result appear at rank 1? Did the system rank the best answer highest? For evaluation, you could assign a relevancy score to each result (for example, 3 = very relevant, 2 = somewhat relevant, 1 = barely relevant, 0 = not relevant) and then report the average for the top-K. Or simply discuss qualitatively how relevant the results generally were. We will look for some discussion on result relevancy in your report.
+        It’s important that you not only compute these metrics but also interpret them. For instance, if Approach A had Precision@3 of 100% for all queries, but Approach B had 80%, that indicates Approach A’s retrieval is more precise – you should investigate why (and explain possible reasons in your insights). Likewise, if one approach had higher recall, what trade-off might that imply? Present your metrics clearly (tables or charts are welcome, but numerical tables are fine given our text-based submission).
+    Quality of Test Set: We expect at least 10 queries per codebase, as stated. So minimum 10 for xv6 and 10 for llama_index, total 20 queries. Full credit if you provide this set and use it in evaluations. The queries should be meaningful (not trivial or overly broad). We will quickly gauge if the questions cover a range of topics. For example, 10 queries that all ask about different functions in xv6 (file system, memory allocation, process management, etc.) is better than 10 queries that all focus on one file. We’re looking for effort in creating a diverse test set that truly challenges your RAG system. If your queries are very simplistic or you have fewer than required, points will be deducted. Additionally, using some real-world inspired questions (like ones a developer might ask when reading the code) is a plus.
+    Comparison Discussion: We will evaluate how well you analyzed the differences between the baseline and extended approaches. Did you clearly state which approach performed better and by how much? Did you attempt to explain the differences using technical reasoning (e.g., “including line numbers in the chunk text didn’t help because the embedding model treats them as just numbers and they added noise” or “the smaller chunk size improved recall slightly because more granular pieces could be retrieved, but it hurt precision because some pieces lacked context”)? We want to see that you can connect the results back to the theory from the background. Good insights and thoughtful interpretation of why certain numbers turned out the way they did will score higher.
+
+Documentation & Clarity (20%)
+
+    Report Clarity: Is the written documentation well-organized and easy to follow? We should see clear headings, logical flow from background to methodology to results. Points are awarded for concise explanations that still cover all necessary details. Diagrams or tables (if any) that aid understanding will be viewed positively. We’ve emphasized maintaining good structure in this project statement, and we expect the same in your submissions. An evaluater who isn’t intimately familiar with your code should still understand what you did by reading the report. If there were any deviations or surprises, those should be clearly noted.
+    Code Readability: We will skim your code to ensure it’s not an unmanageable tangle. You don’t need to have perfect software-engineering style, but things like meaningful variable names, functions to avoid repetition, and comments where non-obvious logic is used will be considered. If we struggle to understand your code or run it, that’s a problem. Make sure you clean up any debug prints or dead code before submitting. It’s okay if the code is in a Jupyter notebook as long as it’s organized (maybe one for indexing, one for querying/testing) and documented with markdown cells.
+    Correct Citation and Attribution: If you referred to external resources (blog posts, StackOverflow answers, etc.) for help, ensure you cite them in your documentation. Do not just copy-paste code from somewhere without attribution. Academic integrity rules apply – your work should be your own, and any inspiration or references must be acknowledged. Given that this assignment expects some research into chunking strategies, we will not be surprised (in fact, we encourage) if you cite an article or documentation (for example, you might cite the LlamaIndex docs or a relevant blog in your background section). Just make sure it’s cited properly. (Use a format similar to the citations in this project statement for consistency.)
+
+Originality & Effort (10%)
+
+    Going the Extra Mile: This portion of the evaluation is reserved for any extra effort that stands out. Did you try something truly novel beyond the required extensions? For example, maybe you attempted the LSP-based chunking, or implemented a hybrid approach that combines keyword filtering with embeddings, or experimented with two different embedding models to see which is better for code. Perhaps you created a small user interface to demo the Q\&A system. These are not required, but if done, they will be noted. Be sure to document any such additional work so we don’t miss it.
+    Insightfulness: Even if you stick strictly to the required parts, an insightful analysis or thoughtful discussion can earn credit here. Show that you really dug into the problem. For instance, connecting your findings to known issues (like “we noticed the model sometimes mixes up two functions with the same name – this is likely because their embeddings are very close; disambiguating them might require including the class name in the chunk text”) demonstrates understanding. This project is as much about learning as it is about building, so evidence of learning (even through, say, a brief section on “What we would try next if we had more time”) is valuable.
+
+Finally, note that group submissions will be held to a proportional expectation. A group of 3 students is expected to produce a more thorough project (perhaps trying more extensions or documenting more findings) than a solo student, simply due to having more person-power. All groups, regardless of size, will be evaluated on the above criteria, but we will be mindful of scope. If you worked in a group of 2 or 3, ensure that your division of work is clear (you can include a short statement of who did what). Ideally, each member should have contributed to both coding and analysis. We may ask individual members questions about the project to verify understanding.
+Group Work
+
+You may choose to work alone or in a team of up to 3 students for this assignment. Collaborative work is encouraged given the project’s scope – splitting tasks like indexing the two different codebases, or one person focusing on baseline while another explores extensions, can be effective. If you work in a group, list all member names clearly in your submission. Only one submission per group is needed (we will assume it’s a joint submission for all listed members).
+
+Expectations for Groups: The difficulty of the project is not intended to scale linearly with group size, but larger groups should aim to explore deeper or try more things. For example, a group of 3 might attempt 3 or 4 different retrieval approaches and a very comprehensive analysis, whereas an individual might implement 2 approaches and a solid analysis. We won’t penalize smaller teams for doing less, but we do expect a baseline implementation at minimum from everyone. The evaluation will primarily consider the quality of what’s done, not just quantity. Coordination and equal contribution are part of the learning experience in group work, so plan and divide tasks early.
+
+Remember to use version control (e.g., GitHub) to collaborate if in a group, and make sure everyone understands the whole project, not just their part. There will be a project presentation or Q\&A where each member might need to explain aspects of the work.
+
+By following this project guide, you should be well-equipped to implement a RAG system for codebases and gain hands-on experience with cutting-edge tools like LlamaIndex and ChromaDB. The assignment is designed to mimic real-world scenarios (e.g., a developer assistant that can answer questions about a code repository), so think of it as building a prototype of such a system. Good luck, and we look forward to seeing both a working system and your learnings documented in the report!
+xv6-riscv – Example Queries and Ground Truth
+
+    Process Management – “How does xv6-riscv create a new process when fork() is called?”
+        Ground Truth: The fork() system call (in kernel/proc.c) allocates a new process by calling allocproc(), then copies the parent’s memory and state to the child. For example, fork() uses allocproc() to get a new proc struct​
+        github.com
+        . The allocproc() function initializes a UNUSED slot from the process table with a new PID, allocates a kernel stack and user page table, and returns with the process in the USED state​
+        github.com
+        ​
+        github.com
+        .
+    File System Operations – “Where is the open system call implemented in xv6, and how does it create new files?”
+        Ground Truth: File-related syscalls are defined in kernel/sysfile.c. The function sys_open() parses path and flags, then if the O_CREATE flag is set it calls create() to allocate a new inode (file)​
+        github.com
+        . Otherwise it uses namei() to get the inode. It then allocates a file structure with filealloc() and a file descriptor via fdalloc()​
+        github.com
+        . This is how xv6 implements open(…) internally.
+    Memory Allocation – “What function does xv6 use to allocate a page of memory in the kernel?”
+        Ground Truth: xv6’s physical page allocator is implemented in kernel/kalloc.c. The function kalloc() returns a free 4096-byte page. It acquires the spinlock kmem.lock and removes one page from the free list kmem.freelist​
+        github.com
+        , then releases the lock and returns the page pointer​
+        github.com
+        . This ensures thread-safe allocation of memory pages.
+    Scheduling – “Where is the CPU scheduler loop in xv6-riscv, and what does it do?”
+        Ground Truth: The scheduling loop is in the scheduler() function (in kernel/proc.c). This function runs on each CPU: it repeatedly loops through the process table to find a process in the RUNNABLE state, then sets it to RUNNING and context-switches to it using swtch()​
+        github.com
+        ​
+        github.com
+        . When that process yields or exits (changing its state), control returns to scheduler(), which continues the loop.
+    System Calls – “How does xv6 dispatch a system call to the correct kernel function?”
+        Ground Truth: When a user process triggers a system call (via the RISC-V ecall), the trap handler calls syscall() (defined in kernel/syscall.c). In syscall(), xv6 retrieves the system call number from the trapped process’s register (stored in p->trapframe->a7) and uses it as an index into the syscalls[] function pointer table. It then calls the corresponding handler and stores its return value in p->trapframe->a0​
+        github.com
+        ​
+        github.com
+        . For example, a read system call (number 5) is dispatched to sys_read().
+    Interrupt Handling – “How does xv6-riscv handle hardware interrupts like the clock or UART?”
+        Ground Truth: In xv6, interrupts are handled in the trap handling code (see kernel/trap.c). The function devintr() is called to process device interrupts. It checks the cause: for a PLIC external interrupt (scause 0x800…09), it reads the interrupt ID via plic_claim() and calls the device-specific handler (e.g. uartintr() for UART or virtio_disk_intr() for disk)​
+        github.com
+        ​
+        github.com
+        , then acknowledges the interrupt with plic_complete(). For a timer interrupt (scause 0x800…05), devintr() calls the clock interrupt handler clockintr()​
+        github.com
+        which notifies the scheduler (by setting which_dev==2, causing a yield).
+    Kernel Synchronization – “What mechanism does xv6 use to protect shared data in the kernel, and where is it implemented?”
+        Ground Truth: xv6 uses spinlocks for mutual exclusion. The implementation is in kernel/spinlock.c. For example, acquire(struct spinlock *lk) disables interrupts on the calling CPU (push_off()), then atomically tests-and-sets the lock using RISC-V atomic instructions (via __sync_lock_test_and_set) in a loop until the lock is obtained​
+        github.com
+        ​
+        github.com
+        . Correspondingly, release() re-enables interrupts (pop_off()) after clearing the lock. This prevents race conditions in the kernel (e.g., around the free memory list in kalloc() which uses kmem.lock).
+    Boot Sequence – “What are the steps of the xv6 boot process on RISC-V, from power-on to the first process?”
+        Ground Truth: On RISC-V, a minimal boot loader in ROM loads the xv6 kernel into memory at physical address 0x80000000. Execution starts at the kernel entry point _entry in kernel/entry.S, which runs in machine mode​
+        clownote.github.io
+        . _entry sets up a stack for each hart (CPU) and then jumps to the C function start() (in kernel/start.c). The start() function enables paging and switches to supervisor mode, then calls the kernel main() in kernel/main.c​
+        clownote.github.io
+        . Inside main(), xv6 initializes devices and then creates the first user process by calling userinit() (which sets up the init process)​
+        clownote.github.io
+        . The init process runs initcode.S and execs /init, after which the system is up and running.
+    User Process Management – “How is the very first user process created in xv6-riscv?”
+        Ground Truth: The first user process is created in the function userinit() (in kernel/proc.c). This function calls allocproc() to allocate a new process slot and sets it as initproc​
+        github.com
+        . It then allocates one page of memory for the user program and copies a small binary (initcode, an embedded program) into that page using uvmfirst()​
+        github.com
+        . The new process’s size p->sz is set to one page, and its trapframe’s program counter (epc) is initialized to 0 (the start of initcode) and stack pointer to the top of that page​
+        github.com
+        . Finally, it names the process “initcode”, sets its current directory to root, marks it RUNNABLE, and releases the lock – making it ready to run as the first user process.
+    Virtual Memory Handling – “Where in the xv6 code is virtual address translation set up, for example mapping virtual pages to physical memory?”
+        Ground Truth: Virtual memory setup and page table management are in kernel/vm.c. A key function is mappages(), which adds PTEs to a page table. It iterates over a virtual address range, calls walk() to allocate any required page-table pages, and then writes the physical address and permissions into each new page-table entry, marking it valid​
+        github.com
+        ​
+        github.com
+        . For instance, xv6 uses mappages to map the kernel’s memory during initialization and to map user pages when a process grows. The kvminit() and kvminithart() functions set up and activate the kernel page table​
+        github.com
+        ​
+        github.com
+        .
+
+LlamaIndex – Example Queries and Ground Truth
+
+    Index Construction – “How does LlamaIndex build an index from a set of document nodes?”
+        Ground Truth: In LlamaIndex, each index (e.g. VectorStoreIndex) provides a method to build from nodes. Internally, VectorStoreIndex.build_index_from_nodes() will filter out any nodes with no content and then call its helper _build_index_from_nodes() to actually insert the nodes​
+        docs.llamaindex.ai
+        ​
+        docs.llamaindex.ai
+        . The _build_index_from_nodes method batches the nodes and adds them to the index’s data structures (the vector store and index_struct). This is an override of the base index method, optimized so that if the vector store keeps text, it can avoid storing duplicate text in the docstore​
+        docs.llamaindex.ai
+        ​
+        docs.llamaindex.ai
+        .
+    Embedding Models – “Where does LlamaIndex define which embedding model to use for text, and how is it used?”
+        Ground Truth: When you create a VectorStoreIndex, it either uses a provided embedding model or falls back to a default. In the VectorStoreIndex.__init__, the code sets self._embed_model by calling resolve_embed_model(...). If no model is passed, it uses the global Settings.embed_model​
+        docs.llamaindex.ai
+        . Later, during query retrieval, this embedding model is used to encode the query: for example, in VectorIndexRetriever._retrieve(), if the query has no precomputed embedding, it invokes self._embed_model.get_agg_embedding_from_queries(...) to get an embedding for the query text​
+        docs.llamaindex.ai
+        . This embedding is then used to find similar nodes.
+    Vector Store Integration – “How can you plug in a custom vector database (vector store) into LlamaIndex’s indexing?”
+        Ground Truth: LlamaIndex abstracts vector stores via a BaseVectorStore interface. You can integrate a custom store by creating a storage context with it or using the index’s helper. For example, VectorStoreIndex.from_vector_store(vector_store, embed_model=..., **kwargs) creates a new index backed by an external vector store​
+        docs.llamaindex.ai
+        . Internally, this method wraps the provided vector_store in a StorageContext (via StorageContext.from_defaults(vector_store=...)) and then initializes the index with that context​
+        docs.llamaindex.ai
+        . The vector store must comply with the interface (e.g., provide similarity search and possibly store text). Once integrated, the index will use that for inserting and querying embeddings instead of the default in-memory store.
+    Query Processing – “What happens under the hood when you query a VectorStoreIndex in LlamaIndex?”
+        Ground Truth: A high-level query (e.g. via query_engine.query("...")) uses a retriever and a response synthesizer. For a VectorStoreIndex, the retriever is a VectorIndexRetriever. In its _retrieve() method, it prepares a QueryBundle (containing the query string and possibly an embedding). If the query text isn’t yet embedded, it calls the index’s _embed_model to compute the query embedding​
+        docs.llamaindex.ai
+        . It then constructs a VectorStoreQuery with that embedding and parameters like top-K and filter conditions, and queries the underlying vector store​
+        docs.llamaindex.ai
+        . The result is a set of NodeWithScore objects (retrieved chunks with similarity scores). These are then passed to the response synthesizer to generate the final answer.
+    Node Parsers and Chunking – “How does LlamaIndex split documents into chunks (nodes) before indexing?”
+        Ground Truth: LlamaIndex uses text splitters (often via a NodeParser) to break documents into Node objects. For example, the TokenTextSplitter is a common splitter that divides text based on token count. In code, TokenTextSplitter (subclass of MetadataAwareTextSplitter) has parameters like chunk_size and chunk_overlap to control the size of each chunk and overlap between chunks​
+        docs.llamaindex.ai
+        . It splits the input by tokens (default separator is space) and produces text chunks up to chunk_size tokens, overlapping by chunk_overlap tokens if specified​
+        docs.llamaindex.ai
+        . These chunks become Node objects (with their text and metadata) which the index then stores. Different parsers/splitters exist for specific formats (HTML, JSON, code, etc.), but they all serve to chunk source documents into smaller pieces for indexing.
+    Response Synthesis – “How does LlamaIndex synthesize a final answer from the retrieved nodes?”
+        Ground Truth: After retrieval, LlamaIndex uses a ResponseSynthesizer to combine the information from nodes and generate an answer (usually via an LLM). The ResponseSynthesizer takes the list of Node contents (and maybe their metadata) and prompts the language model to produce a coherent response. For example, one can configure a ResponseSynthesizer with certain settings or post-processors: ResponseSynthesizer.from_args(node_postprocessors=[SimilarityPostprocessor(...)])&#8203;:contentReference[oaicite:38]{index=38}. In a custom query pipeline, you might assemble a RetrieverQueryEngine with a retriever and a response_synthesizer​
+        llama-index.readthedocs.io
+        . Internally, the synthesizer will likely format a prompt with the retrieved texts and ask the LLM to answer the user’s query. (In older versions, this was called a response builder). The exact code uses the LLM interface (from llama_index.core.llm) to generate the final answer string from the nodes.
+    Retrieval Strategies – “What retrieval strategies does LlamaIndex support for finding relevant nodes?”
+        Ground Truth: LlamaIndex supports vector similarity search, keyword/sparse search, and hybrid combinations, depending on the index and retriever. For instance, the VectorIndexRetriever (for VectorStoreIndex) has a parameter vector_store_query_mode to toggle between modes – e.g. VectorStoreQueryMode.DEFAULT (dense cosine similarity), BASIC, HYBRID, etc. It also accepts an alpha parameter to weight hybrid search (combining sparse and dense scores)​
+        docs.llamaindex.ai
+        . Additionally, retrievers accept filters (MetadataFilters) to restrict results by metadata​
+        docs.llamaindex.ai
+        . In the code, when building the query, it populates a VectorStoreQuery object with the query embedding, similarity_top_k, any doc_ids restriction, the mode, alpha, and filters​
+        docs.llamaindex.ai
+        before hitting the vector store. Other index types have their own retrievers (e.g. a list index can retrieve by traversal or by embeddings). These modular strategies let you choose pure vector search, filtered search, or hybrid (sparse+dense) retrieval as needed.
+    Metadata Handling – “How does LlamaIndex handle metadata for nodes, and can you filter search results by metadata?”
+        Ground Truth: Every Node in LlamaIndex can carry metadata (as a dictionary of fields). This metadata is stored in the index’s docstore and can be used at query time. LlamaIndex provides a MetadataFilters mechanism: you can specify filters (e.g., { "author": "Alice"}) and the retriever will only return nodes whose metadata match. In the VectorIndexRetriever, for example, there is a filters parameter in its constructor​
+        docs.llamaindex.ai
+        . If filters are set, the retriever applies them when constructing the query or post-filters the results from the vector store. Additionally, the index keeps mappings of document IDs to node IDs (RefDocInfo) so it knows which nodes came from which source document​
+        docs.llamaindex.ai
+        . This helps when returning results – if a vector store returns only IDs, the retriever can fetch the full Node (with text + metadata) from the docstore by mapping the ID to the node object​
+        docs.llamaindex.ai
+        ​
+        docs.llamaindex.ai
+        . In summary, metadata is preserved with each node, stored in the docstore, and usable for filtering and for reference in responses.
+    API Usage – “What is the typical API pattern to construct an index and query it using LlamaIndex?”
+
+Ground Truth: Using LlamaIndex typically involves: (a) reading your data into Document objects, (b) building an index from those documents, and (c) querying the index. For example, using the high-level API:
+python
+Copy
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+documents = SimpleDirectoryReader("YOUR_DATA_DIRECTORY").load_data()
+index = VectorStoreIndex.from_documents(documents)
+This will load files from a directory into documents and then create a vector index​
+github.com
+. To query the index, you can do:
+python
+Copy
+query_engine = index.as_query_engine()
+answer = query_engine.query("Your question here")
+print(answer)
+
+    which will retrieve relevant info and print a response​
+    github.com
+    . Under the hood, as_query_engine() sets up a default retriever and synthesizer for the index. This simple pattern – ingest data, build index, ask questions – is the intended usage.
+        Data Connectors and Sources – “How does LlamaIndex connect to external data sources? For example, how can I load documents from various formats or platforms?”
+        Ground Truth: LlamaIndex provides Reader classes (connectors) for many data sources. For local files, the SimpleDirectoryReader is a basic connector that reads all files in a folder. Its load_data() method opens each file and wraps the text into a Document object​
+        docs.llamaindex.ai
+        . There are more specialized readers available (many through the LlamaHub library) for sources like Notion, Slack, Wikipedia, etc. Each of these readers returns documents/nodes that LlamaIndex can ingest. For instance, BeautifulSoupWebReader can fetch and parse HTML from a URL into Document nodes, and a NotionPageReader can pull pages from Notion. All such connectors ultimately produce Document objects (with text and metadata) that you then pass to an index (e.g., via index = VectorStoreIndex.from_documents(docs)). Thus, the “data connector” stage is separate from indexing – it’s about converting external data into a standard format for LlamaIndex. (In code, using a LlamaHub loader might look like: loader = download_loader("NotionPageReader")(...); docs = loader.load_data(); index = VectorStoreIndex.from_documents(docs) – demonstrating the pattern of load then index.)
