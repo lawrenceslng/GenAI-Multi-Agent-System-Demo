@@ -1,0 +1,206 @@
+(genai_project_3) lawrence@Lawrences-MacBook-Pro part_3 % python multi_agent_stock_analysis.py 
+
+Welcome to the Multi-Agent Stock Market Analyst! Type 'exit' to quit.
+
+
+Enter a stock symbol or company name (e.g., AAPL, TSLA):
+ > TSLA
+
+Analyzing TSLA...
+
+==================================================
+🤖 Agent: WebSearchAgent
+==================================================
+
+🛠️  Planning to use tools: ['search']
+🔨 Calling Tool: search
+  With arguments: {'query': 'TSLA stock news', 'max_results': 10}
+🔧 Tool Result (search):
+  Arguments: {'query': 'TSLA stock news', 'max_results': 10}
+  Output: [Document(id_='058510b7-cc4c-46ce-b9cf-5e26ad35b2b8', embedding=None, metadata={'url': 'https://www.marketwatch.com/investing/stock/tsla'}, excluded_embed_metadata_keys=[], excluded_llm_metadata_keys=[], relationships={}, metadata_template='{key}: {value}', metadata_separator='\n', text_resource=MediaResource(embeddings=None, data=None, text="Mar. 3, 2025 at 8:50 a.m. ET on GuruFocus.com\nTesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick\nMar. 3, 2025 at 8:11 a.m. ET on TipRanks.com\nTesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound\nTesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound\nMar. 3, 2025 at 8:10 a.m. ET on GuruFocus.com\nAI-Powered EV Revolution: Why NVDA & CHPT are Smart Buys Now\nMar. 3, 2025 at 8:07 a.m. ET on Zacks.com [...] No Headlines Available\nOther News Press Releases\nU.S. Stock Futures Rise as Investors Eye Tesla and Bitcoin\nU.S. Stock Futures Rise as Investors Eye Tesla and Bitcoin\nMar. 3, 2025 at 9:11 a.m. ET on GuruFocus.com\nNotable open interest changes for March 3rd\nMar. 3, 2025 at 8:55 a.m. ET on TipRanks.com\nTesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies\nTesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies [...] Mar. 3, 2025 at 4:36 a.m. ET on Benzinga.com\nTesla’s February Sales Plunge 26% in France as 2025 Struggles Continue\nMar. 3, 2025 at 4:33 a.m. ET on TipRanks.com\nTesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X: 'There Is Always More Performance'\nMar. 3, 2025 at 3:39 a.m. ET on Benzinga.com\nTesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics\nMar. 3, 2025 at 3:36 a.m. ET on TipRanks.com", path=None, url=None, mimetype=None), image_resource=None, audio_resource=None, video_resource=None, text_template='{metadata_str}\n\n{content}'), Document(id_='26f7e832-6b9f-4d91-97cb-d51eedadad5e', embedding=None, metadata={'url': 'https://www.morningstar.com/stocks/xnas/tsla/quote'}, excluded_embed_metadata_keys=[], excluded_llm_metadata_keys=[], relationships={}, metadata_template='{key}: {value}', metadata_separator='\n', text_resource=MediaResource(embeddings=None, data=None, text="View History\nTSLA is trading at a 689% premium.\nPrice\n$361.62\nFeb 7, 2025\nFair Value\n$677.00\nJan 30, 2025\nUncertainty\nVery High\n1-Star Price\n$433.50\n5-Star Price\n$859.00\nEconomic Moat\nCfglhj\nCapital Allocation\nCnhjhvfmp\nBulls Say, Bears Say\n\nBulls\n\nTesla has the potential to disrupt the automotive and power generation industries with its technology for EVs, AVs, batteries, and solar generation systems.\n\nBears [...] Tesla Inc TSLA\nMorningstar Rating\nUnlock\nStock XNAS Rating as of Feb 7, 2025\nDownload PDF\n\nSummary\nChart\nNews\nPrice vs Fair Value\nSustainability\nTrailing Returns\nKey Metrics\nFinancials\nValuation\nDividends\nOwnership\nExecutive\n\n$361.62 −12.70 (3.39%)\nView Full Chart\nAs of Feb 7, 2025 9:00pm Delayed Price Closed\nCompany Report\n\nView Archive [...] ### Do you have too much of your money invested in the stock market?  MarketWatch Feb 7, 2025 7:14pm\n### Tesla's struggling in another foreign market - and this one is important  MarketWatch Feb 7, 2025 1:00pm\n### Inside the fight to stop Elon Musk and 'DOGE' from accessing your personal financial information  MarketWatch Feb 6, 2025 9:35pm\n### Individual investors have been on a record-setting buying streak - and they are loving the Magnificent Seven  MarketWatch Feb 6, 2025 4:23pm", path=None, url=None, mimetype=None), image_resource=None, audio_resource=None, video_resource=None, text_template='{metadata_str}\n\n{content}'), Document(id_='04131ade-5a8f-45f4-8029-f07e2d7e0a9a', embedding=None, metadata={'url': 'https://finance.yahoo.com/quote/TSLA/'}, excluded_embed_metadata_keys=[], excluded_llm_metadata_keys=[], relationships={}, metadata_template='{key}: {value}', metadata_separator='\n', text_resource=MediaResource(embeddings=None, data=None, text="Previous Close 374.32\nOpen 370.18\nBid 344.39 x 100\nAsk 378.00 x 100\nDay's Range 360.34 - 380.55\n52 Week Range 138.80 - 488.54\nVolume 68,552,768\nAvg. Volume 86,592,062\nMarket Cap (intraday) 1.204T\nBeta (5Y Monthly) 2.30\nPE Ratio (TTM) 185.45\nEPS (TTM) 1.95\nEarnings Date Apr 23, 2025 - May 3, 2025\nForward Dividend & Yield --\nEx-Dividend Date --\n1y Target Est 336.86 [...] www.tesla.com\n140,473\nFull Time Employees\nDecember 31\nFiscal Year Ends\nConsumer Cyclical\nSector\nAuto Manufacturers\nIndustry\nMore about Tesla, Inc.\nRecent News: TSLA\nView More\nAll News Press Releases\nSEC Filings\nAll SEC Filings\nCorporate Changes & Voting Matters\nPeriodic Financial Reports\nProxy Statements\nTender Offer/Acquisition Reports\nOffering Registrations\nView More\nPerformance Overview: TSLA [...] Market Cap\n1.20T\n\n\nEnterprise Value\n1.18T\n\n\nTrailing P/E\n183.49\n\n\nForward P/E\n126.58\n\n\nPEG Ratio (5yr expected)\n5.27\n\n\nPrice/Sales (ttm)\n13.40\n\n\nPrice/Book (mrq)\n16.51\n\n\nEnterprise Value/Revenue\n12.09\n\n\nEnterprise Value/EBITDA\n80.30\n\n\nFinancial Highlights\nProfitability and Income Statement\n\n\nProfit Margin\n13.08%\n\n\nReturn on Assets (ttm)\n4.76%\n\n\nReturn on Equity (ttm)\n20.39%\n\n\nRevenue (ttm)\n97.15B\n\n\nNet Income Avi to Common (ttm)\n12.74B\n\n\nDiluted EPS (ttm)\n1.95\n\n\nBalance Sheet and Cash Flow", path=None, url=None, mimetype=None), image_resource=None, audio_resource=None, video_resource=None, text_template='{metadata_str}\n\n{content}'), Document(id_='d466cfde-11c3-4c71-ab7b-f40c0f7234cc', embedding=None, metadata={'url': 'https://finance.yahoo.com/quote/TSLA/news/'}, excluded_embed_metadata_keys=[], excluded_llm_metadata_keys=[], relationships={}, metadata_template='{key}: {value}', metadata_separator='\n', text_resource=MediaResource(embeddings=None, data=None, text="### Trump suspends $5B EV charger funding. These stocks are falling. President Trump suspends a $5 billion federal program from the Biden administration that would fund the build-out of electric vehicle charging infrastructure in the US. EV charging stocks Tesla (TSLA), Blink Charging (BLNK), and EVgo (EVGO) fall in the session on this news. Julie Hyman and Josh Lipton highlight how EV chargers are reacting to the news. To watch more expert insights and analysis on the latest market action, [...] Summary\nNews\nResearch\nChart\nCommunity\nStatistics\nHistorical Data\nProfile\nFinancials\nAnalysis\nOptions\nHolders\nSustainability\n\nNasdaqGS - Nasdaq Real Time Price • USD\nTesla, Inc. (TSLA)\nFollow\nCompare\n361.62\n-12.70\n(-3.39%)\nAt close: February 7 at 4:00:01 PM EST\n357.38\n-4.24\n(-1.17%)\nAfter hours: 8:00:00 PM EST\nAll News Press Releases\nSEC Filings\nAll SEC Filings\nCorporate Changes & Voting Matters\nPeriodic Financial Reports\nProxy Statements\nTender Offer/Acquisition Reports\nOffering Registrations [...] Tesla, Inc. (TSLA) Latest Stock News & Headlines - Yahoo Finance\n\nNews\n\nToday's news\nUS\nPolitics\nWorld\n\nTech\n\nReviews and deals\nAudio\nComputing\nGaming\nHealth\nHome\nPhones\nScience\nTVs\nClimate change\nHealth\nScience\n\nOriginals\n\n\nThe 360\n\nNewsletters\n\n\n\n\nLife\n\n\nHealth\n\nCOVID-19\nFall allergies\nHealth news\nMental health\nRelax\nSexual health\nStudies\nThe Unwind\n\nParenting\n\n\nFamily health\n\nSo mini ways\n\nStyle and beauty\n\n\nIt Figures\n\nUnapologetically\nHoroscopes\n\nShopping\n\n\nBuying guides", path=None, url=None, mimetype=None), image_resource=None, audio_resource=None, video_resource=None, text_template='{metadata_str}\n\n{content}'), Document(id_='fc418a86-f681-4bc3-bc82-976dc7f80abc', embedding=None, metadata={'url': 'https://www.cnn.com/markets/stocks/TSLA'}, excluded_embed_metadata_keys=[], excluded_llm_metadata_keys=[], relationships={}, metadata_template='{key}: {value}', metadata_separator='\n', text_resource=MediaResource(embeddings=None, data=None, text='as Interest in Politically Influential Musk Grows by TipRanks Feb 06, 2025 2:35am ET Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities by TipRanks Feb 05, 2025 8:54pm ET ‘Dump Now, Buy Later,’ Says Investor About Tesla Stock by TipRanks Feb 05, 2025 2:24pm ET Tesla (TSLA) Sales in Germany Plummet by 59% by TipRanks Feb 05, 2025 12:13pm ET Elon Musk’s Lawsuit Against OpenAI Won’t Stop Its For-Profit Transformation by TipRanks Feb 05, 2025 8:15am ET Enphase Energy price target [...] lowered to $90 from $100 at Roth MKM by TipRanks Feb 05, 2025 7:15am ET GM Lays Off Half of Cruise Workforce After Pulling the Plug on Robotaxi by TipRanks Feb 05, 2025 5:04am ET Palantir Stock: Wedbush’s Daniel Ives Lifts Price Target to $120 for the “Messi of AI Story” by TipRanks Feb 05, 2025 4:55am ET M&A News: Honda-Nissan Merger in Turmoil over Control Dispute by TipRanks Feb 05, 2025 2:42am ET Tesla (TSLA) Reignites Price War in China with Insurance Subsidy by TipRanks Feb 04, 2025 [...] Yesterday 4:30pm ET What You Misseed On Wall Street On Friday by TipRanks Yesterday 3:55pm ET Sector Spotlight: Car makers brace for change under Trump Administration by TipRanks Yesterday 1:16pm ET Tesla Stock (TSLA) Falls amid China-U.S. Trade War Concerns and Declining Deliveries by TipRanks Yesterday 12:15pm ET EU to offer to reduce tariffs on U.S. cars, FT reports by TipRanks Yesterday 12:05pm ET Amazon reports Q4 beat, Tesla car sales fall in China: Morning Buzz by TipRanks Yesterday', path=None, url=None, mimetype=None), image_resource=None, audio_resource=None, video_resource=None, text_template='{metadata_str}\n\n{content}'), Document(id_='4cc5bacd-bbc3-463b-88bb-7ae2a4de5a5f', embedding=None, metadata={'url': 'https://www.cnbc.com/quotes/TSLA'}, excluded_embed_metadata_keys=[], excluded_llm_metadata_keys=[], relationships={}, metadata_template='{key}: {value}', metadata_separator='\n', text_resource=MediaResource(embeddings=None, data=None, text='WAVE TEMPLATE Grand Supercycle Supercycle Cycle Primary Intermediate Minor Minute Minuette Sub-Minuette Custom\nIMPULSE\nIMPULSE - - - I II III IV V i ii iii iv v 1 2 3 4 5 A B C D E a b c d e W X Y X Z w x y x z\nCORRECTIVE\nCORRECTIVE - - - A B C a b c W X Y w x y\nNone Parentheses Enclosed\nShow Lines:\nSave Config\nRestore Config\nsavecancel\n(right-click to deleteright-click to managedrag to change anchor time)(long-press to drag)\nFull Screen\nTSLA\nTSLA 248.660.10 ( 0.04%) Plots AAPL\n\u200cvol undr\u200c [...] Open0.00\nDay High0.00\nDay Low0.00\nPrev Close248.09\n52 Week High488.54\n52 Week High Date12/18/24\n52 Week Low138.81\n52 Week Low Date04/22/24\n\nKey Stats\n\nMarket Cap797.986B\nShares Out3.22B\n10 Day Average Volume121.87M\nDividend-\nDividend Yield-\nBeta2.63\nYTD % Change-38.57\n\nShow Ratios / Profitability & Events\nSummaryNewsProfileEarningsPeersFinancialsOptionsOwnership\nKEY STATS [...] Open0.00\nDay High0.00\nDay Low0.00\nPrev Close248.09\n52 Week High488.54\n52 Week High Date12/18/24\n52 Week Low138.81\n52 Week Low Date04/22/24\nMarket Cap797.986B\nShares Out3.22B\n10 Day Average Volume121.87M\nDividend-\nDividend Yield-\nBeta2.63\nYTD % Change-38.57\n\nRATIOS/PROFITABILITY\n\nEPS (TTM)2.04\nP/E (TTM)121.81\nFwd P/E (NTM)94.16\nEBITDA (TTM)13.128B\nROE (TTM)10.53%\nRevenue (TTM)97.69B\nGross Margin (TTM)17.87%\nNet Margin (TTM)7.33%\nDebt To Equity (MRQ)11.27%\n\nEVENTS', path=None, url=None, mimetype=None), image_resource=None, audio_resource=None, video_resource=None, text_template='{metadata_str}\n\n{content}'), Document(id_='85f91b68-f9b3-4b91-8029-a52accd2d1bf', embedding=None, metadata={'url': 'https://www.nasdaq.com/market-activity/stocks/tsla'}, excluded_embed_metadata_keys=[], excluded_llm_metadata_keys=[], relationships={}, metadata_template='{key}: {value}', metadata_separator='\n', text_resource=MediaResource(embeddings=None, data=None, text='Summary\nReal-Time\nAfter-Hours\nPre-Market\n\nCharts\n\n\nNews\n\n\nPress Releases\n\n\nDividend History\n\nHistorical Quotes\nHistorical NOCP\nFinancials\nEarnings\nP/E & PEG Ratios\nOption Chain\nShort Interest\nInstitutional Holdings\nInsider Activity\nSEC Filings\nRevenue EPS\n\nSymbol Search\nScreener ->\nRecently Viewed\nData is currently not available\nSymbol Search\nScreener ->\n\nRecently Viewed\nData is currently not available\nLatest News\nThis data feed is not available at this time.\nData is currently not available\n\n• [...] Quick Links\nQuestion Today\nNasdaq MarketSite\nInvestor Relations\nESG Reporting Guide\nEuropean Markets\nNasdaq Nordic Foundation\nNasdaq Thought Leadership\n\n\nNasdaq Initiatives\nPurpose\nMarket Structure Policy Advocacy\nPublic Policy Advocacy\nESG at Nasdaq\nNasdaq Entrepreneurial Center\nNasdaq Ventures\nNasdaq and the Cloud\n\n\n\nExplore All About ->\n\n\nLog in\n\n\nSign In \n\nTSLA\nSummary\n\n\nQuotes\n\nSummary\nReal-Time\nAfter-Hours\nPre-Market\nCharts\n\n\n\nNews & Analysis\n\nNews\nPress Releases\n\n\n\nDividend History', path=None, url=None, mimetype=None), image_resource=None, audio_resource=None, video_resource=None, text_template='{metadata_str}\n\n{content}'), Document(id_='4d08c62b-e5fc-40ee-8132-8d6cc10d6c89', embedding=None, metadata={'url': 'https://www.teslarati.com/tesla-tsla-stock-woes-overblown-considering-long-term-catalysts-analyst/'}, excluded_embed_metadata_keys=[], excluded_llm_metadata_keys=[], relationships={}, metadata_template='{key}: {value}', metadata_separator='\n', text_resource=MediaResource(embeddings=None, data=None, text='Tesla stock (NASDAQ: TSLA) has been under tremendous pressure as a result of CEO Elon Musk’s involvement in the United States Government and other factors, like tariffs and lower-than-expected delivery figures.\nHowever, one analyst says that the concerns regarding Tesla’s short-term performance are “overblown”, considering all the things the company has in the works for the future.', path=None, url=None, mimetype=None), image_resource=None, audio_resource=None, video_resource=None, text_template='{metadata_str}\n\n{content}')]
+📤 Output: Here are the latest headlines about Tesla (TSLA):
+
+1. "Tesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick" - GuruFocus.com, March 3, 2025
+2. "Tesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound" - TipRanks.com, March 3, 2025
+3. "Tesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies" - Benzinga.com, March 3, 2025
+4. "Tesla’s February Sales Plunge 26% in France as 2025 Struggles Continue" - TipRanks.com, March 3, 2025
+5. "Tesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X" - Benzinga.com, March 3, 2025
+6. "Tesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics" - TipRanks.com, March 3, 2025
+7. "Trump suspends $5B EV charger funding. These stocks are falling." - Yahoo Finance, February 7, 2025
+8. "Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities" - TipRanks, February 5, 2025
+9. "Tesla (TSLA) Sales in Germany Plummet by 59%" - TipRanks, February 5, 2025
+10. "Tesla (TSLA) Reignites Price War in China with Insurance Subsidy" - TipRanks, February 4, 2025
+
+I will now hand off to the SentimentAgent to analyze the sentiment of these headlines.
+🛠️  Planning to use tools: ['handoff']
+🔨 Calling Tool: handoff
+  With arguments: {'to_agent': 'SentimentAgent', 'reason': 'To analyze the sentiment of the latest Tesla (TSLA) news headlines.'}
+🔧 Tool Result (handoff):
+  Arguments: {'to_agent': 'SentimentAgent', 'reason': 'To analyze the sentiment of the latest Tesla (TSLA) news headlines.'}
+  Output: Agent SentimentAgent is now handling the request due to the following reason: To analyze the sentiment of the latest Tesla (TSLA) news headlines..
+Please continue with the current request.
+
+==================================================
+🤖 Agent: SentimentAgent
+==================================================
+
+🛠️  Planning to use tools: ['SentimentAnalysis']
+No model was supplied, defaulted to distilbert/distilbert-base-uncased-finetuned-sst-2-english and revision 714eb0f (https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english).
+Using a pipeline without specifying a model name and revision in production is not recommended.
+🔨 Calling Tool: SentimentAnalysis
+  With arguments: {'headlines': ['Tesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick', 'Tesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound', 'Tesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies', 'Tesla’s February Sales Plunge 26% in France as 2025 Struggles Continue', 'Tesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X', 'Tesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics', 'Trump suspends $5B EV charger funding. These stocks are falling.', 'Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities', 'Tesla (TSLA) Sales in Germany Plummet by 59%', 'Tesla (TSLA) Reignites Price War in China with Insurance Subsidy']}
+🔧 Tool Result (SentimentAnalysis):
+  Arguments: {'headlines': ['Tesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick', 'Tesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound', 'Tesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies', 'Tesla’s February Sales Plunge 26% in France as 2025 Struggles Continue', 'Tesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X', 'Tesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics', 'Trump suspends $5B EV charger funding. These stocks are falling.', 'Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities', 'Tesla (TSLA) Sales in Germany Plummet by 59%', 'Tesla (TSLA) Reignites Price War in China with Insurance Subsidy']}
+  Output: name 'init_empty_weights' is not defined
+📤 Output: It seems there was an error while trying to perform sentiment analysis. I will proceed to hand off to the FinanceAgent to gather additional financial data about Tesla (TSLA).
+🛠️  Planning to use tools: ['handoff']
+🔨 Calling Tool: handoff
+  With arguments: {'to_agent': 'FinanceAgent', 'reason': 'To retrieve detailed financial data about Tesla (TSLA) after sentiment analysis encountered an error.'}
+🔧 Tool Result (handoff):
+  Arguments: {'to_agent': 'FinanceAgent', 'reason': 'To retrieve detailed financial data about Tesla (TSLA) after sentiment analysis encountered an error.'}
+  Output: Agent FinanceAgent is now handling the request due to the following reason: To retrieve detailed financial data about Tesla (TSLA) after sentiment analysis encountered an error..
+Please continue with the current request.
+
+==================================================
+🤖 Agent: FinanceAgent
+==================================================
+
+🛠️  Planning to use tools: ['stock_basic_info', 'stock_analyst_recommendations']
+🔨 Calling Tool: stock_basic_info
+  With arguments: {'ticker': 'TSLA'}
+🔨 Calling Tool: stock_analyst_recommendations
+  With arguments: {'ticker': 'TSLA'}
+🔧 Tool Result (stock_analyst_recommendations):
+  Arguments: {'ticker': 'TSLA'}
+  Output: Recommendations: 
+  period  strongBuy  buy  hold  sell  strongSell
+0     0m          7   16    14     9           2
+1    -1m          7   16    14     9           2
+2    -2m          7   14    15     9           3
+3    -3m          7   13    15     8           4
+🔧 Tool Result (stock_basic_info):
+  Arguments: {'ticker': 'TSLA'}
+  Output: Info: 
+{'address1': '1 Tesla Road', 'city': 'Austin', 'state': 'TX', 'zip': '78725', 'country': 'United States', 'phone': '512 516 8177', 'website': 'https://www.tesla.com', 'industry': 'Auto Manufacturers', 'industryKey': 'auto-manufacturers', 'industryDisp': 'Auto Manufacturers', 'sector': 'Consumer Cyclical', 'sectorKey': 'consumer-cyclical', 'sectorDisp': 'Consumer Cyclical', 'longBusinessSummary': 'Tesla, Inc. designs, develops, manufactures, leases, and sells electric vehicles, and energy generation and storage systems in the United States, China, and internationally. The company operates in two segments, Automotive; and Energy Generation and Storage. The Automotive segment offers electric vehicles, as well as sells automotive regulatory credits; and non-warranty after-sales vehicle, used vehicles, body shop and parts, supercharging, retail merchandise, and vehicle insurance services. This segment also provides sedans and sport utility vehicles through direct and used vehicle sales, a network of Tesla Superchargers, and in-app upgrades; purchase financing and leasing services; services for electric vehicles through its company-owned service locations and Tesla mobile service technicians; and vehicle limited warranties and extended service plans. The Energy Generation and Storage segment engages in the design, manufacture, installation, sale, and leasing of solar energy generation and energy storage products, and related services to residential, commercial, and industrial customers and utilities through its website, stores, and galleries, as well as through a network of channel partners. This segment also provides services and repairs to its energy product customers, including under warranty; and various financing options to its residential customers. The company was formerly known as Tesla Motors, Inc. and changed its name to Tesla, Inc. in February 2017. Tesla, Inc. was incorporated in 2003 and is headquartered in Austin, Texas.', 'fullTimeEmployees': 125665, 'companyOfficers': [{'maxAge': 1, 'name': 'Mr. Elon R. Musk', 'age': 53, 'title': 'Co-Founder, Technoking of Tesla, CEO & Director', 'yearBorn': 1971, 'fiscalYear': 2023, 'exercisedValue': 0, 'unexercisedValue': 0}, {'maxAge': 1, 'name': 'Mr. Vaibhav  Taneja', 'age': 46, 'title': 'Chief Financial Officer', 'yearBorn': 1978, 'fiscalYear': 2023, 'totalPay': 278000, 'exercisedValue': 8517957, 'unexercisedValue': 202075632}, {'maxAge': 1, 'name': 'Mr. Xiaotong  Zhu', 'age': 44, 'title': 'Senior Vice President of Automotive', 'yearBorn': 1980, 'fiscalYear': 2023, 'totalPay': 926877, 'exercisedValue': 0, 'unexercisedValue': 344144320}, {'maxAge': 1, 'name': 'Travis  Axelrod', 'title': 'Head of Investor Relations', 'fiscalYear': 2023, 'exercisedValue': 0, 'unexercisedValue': 0}, {'maxAge': 1, 'name': 'Brian  Scelfo', 'title': 'Senior Director of Corporate Development', 'fiscalYear': 2023, 'exercisedValue': 0, 'unexercisedValue': 0}, {'maxAge': 1, 'name': 'Mr. Franz  von Holzhausen', 'title': 'Chief Designer', 'fiscalYear': 2023, 'exercisedValue': 0, 'unexercisedValue': 0}, {'maxAge': 1, 'name': 'Mr. John  Walker', 'age': 61, 'title': 'Vice President of Sales - North America', 'yearBorn': 1963, 'fiscalYear': 2023, 'totalPay': 121550, 'exercisedValue': 0, 'unexercisedValue': 0}, {'maxAge': 1, 'name': 'Mr. Peter  Bannon', 'title': 'Chip Architect', 'fiscalYear': 2023, 'exercisedValue': 0, 'unexercisedValue': 0}, {'maxAge': 1, 'name': 'Mr. Turner  Caldwell', 'title': 'Engineering Manager', 'fiscalYear': 2023, 'exercisedValue': 0, 'unexercisedValue': 0}, {'maxAge': 1, 'name': 'Mr. Rodney D. Westmoreland Jr.', 'title': 'Director of Construction Management', 'fiscalYear': 2023, 'exercisedValue': 0, 'unexercisedValue': 0}], 'auditRisk': 4, 'boardRisk': 9, 'compensationRisk': 10, 'shareHolderRightsRisk': 9, 'overallRisk': 10, 'governanceEpochDate': 1743465600, 'compensationAsOfEpochDate': 1703980800, 'executiveTeam': [], 'maxAge': 86400, 'priceHint': 2, 'previousClose': 221.86, 'open': 224.5625, 'dayLow': 223.89, 'dayHigh': 274.69, 'regularMarketPreviousClose': 221.86, 'regularMarketOpen': 224.5625, 'regularMarketDayLow': 223.89, 'regularMarketDayHigh': 274.69, 'payoutRatio': 0.0, 'beta': 2.58, 'trailingPE': 133.43138, 'forwardPE': 84.01235, 'volume': 213592591, 'regularMarketVolume': 213592591, 'averageVolume': 107536718, 'averageVolume10days': 167019370, 'averageDailyVolume10Day': 167019370, 'bid': 271.31, 'ask': 273.0, 'bidSize': 1, 'askSize': 1, 'marketCap': 875536777216, 'fiftyTwoWeekLow': 138.8, 'fiftyTwoWeekHigh': 488.54, 'priceToSalesTrailing12Months': 8.9623995, 'fiftyDayAverage': 297.4936, 'twoHundredDayAverage': 289.6466, 'trailingAnnualDividendRate': 0.0, 'trailingAnnualDividendYield': 0.0, 'currency': 'USD', 'tradeable': False, 'enterpriseValue': 747957649408, 'profitMargins': 0.07259, 'floatShares': 2799206117, 'sharesOutstanding': 3216519936, 'sharesShort': 81331870, 'sharesShortPriorMonth': 61498198, 'sharesShortPreviousMonthDate': 1739491200, 'dateShortInterest': 1741910400, 'sharesPercentSharesOut': 0.0253, 'heldPercentInsiders': 0.12886, 'heldPercentInstitutions': 0.49312, 'shortRatio': 0.78, 'shortPercentOfFloat': 0.029000001, 'impliedSharesOutstanding': 3216519936, 'bookValue': 22.672, 'priceToBook': 12.005999, 'lastFiscalYearEnd': 1735603200, 'nextFiscalYearEnd': 1767139200, 'mostRecentQuarter': 1735603200, 'earningsQuarterlyGrowth': -0.708, 'netIncomeToCommon': 7129999872, 'trailingEps': 2.04, 'forwardEps': 3.24, 'lastSplitFactor': '3:1', 'lastSplitDate': 1661385600, 'enterpriseToRevenue': 7.656, 'enterpriseToEbitda': 57.416, '52WeekChange': 0.558992, 'SandP52WeekChange': 0.049593568, 'quoteType': 'EQUITY', 'currentPrice': 272.2, 'targetHighPrice': 515.0, 'targetLowPrice': 120.0, 'targetMeanPrice': 315.2969, 'targetMedianPrice': 317.5, 'recommendationMean': 2.60417, 'recommendationKey': 'hold', 'numberOfAnalystOpinions': 42, 'totalCash': 36563001344, 'totalCashPerShare': 11.367, 'ebitda': 13027000320, 'totalDebt': 13623000064, 'quickRatio': 1.427, 'currentRatio': 2.025, 'totalRevenue': 97690001408, 'debtToEquity': 18.489, 'revenuePerShare': 30.557, 'returnOnAssets': 0.04186, 'returnOnEquity': 0.1042, 'grossProfits': 17450000384, 'freeCashflow': -826875008, 'operatingCashflow': 14922999808, 'earningsGrowth': -0.709, 'revenueGrowth': 0.021, 'grossMargins': 0.17863001, 'ebitdaMargins': 0.13335, 'operatingMargins': 0.06158, 'financialCurrency': 'USD', 'symbol': 'TSLA', 'language': 'en-US', 'region': 'US', 'typeDisp': 'Equity', 'quoteSourceName': 'Nasdaq Real Time Price', 'triggerable': True, 'customPriceAlertConfidence': 'HIGH', 'priceEpsCurrentYear': 105.73297, 'fiftyDayAverageChange': -25.29358, 'fiftyDayAverageChangePercent': -0.08502226, 'twoHundredDayAverageChange': -17.446594, 'twoHundredDayAverageChangePercent': -0.06023407, 'sourceInterval': 15, 'exchangeDataDelayedBy': 0, 'averageAnalystRating': '2.6 - Hold', 'cryptoTradeable': False, 'corporateActions': [], 'postMarketTime': 1744243199, 'regularMarketTime': 1744228803, 'exchange': 'NMS', 'messageBoardId': 'finmb_27444752', 'exchangeTimezoneName': 'America/New_York', 'exchangeTimezoneShortName': 'EDT', 'gmtOffSetMilliseconds': -14400000, 'market': 'us_market', 'esgPopulated': False, 'marketState': 'PREPRE', 'hasPrePostMarketData': True, 'firstTradeDateMilliseconds': 1277818200000, 'postMarketChangePercent': -1.05438, 'postMarketPrice': 269.33, 'postMarketChange': -2.87003, 'regularMarketChange': 50.34001, 'regularMarketDayRange': '223.89 - 274.69', 'fullExchangeName': 'NasdaqGS', 'averageDailyVolume3Month': 107536718, 'fiftyTwoWeekLowChange': 133.40001, 'fiftyTwoWeekLowChangePercent': 0.96109515, 'fiftyTwoWeekRange': '138.8 - 488.54', 'fiftyTwoWeekHighChange': -216.34, 'fiftyTwoWeekHighChangePercent': -0.44282964, 'fiftyTwoWeekChangePercent': 55.899204, 'earningsTimestamp': 1745352000, 'earningsTimestampStart': 1745352000, 'earningsTimestampEnd': 1745352000, 'earningsCallTimestampStart': 1745357400, 'earningsCallTimestampEnd': 1745357400, 'isEarningsDateEstimate': False, 'epsTrailingTwelveMonths': 2.04, 'epsForward': 3.24, 'epsCurrentYear': 2.57441, 'shortName': 'Tesla, Inc.', 'longName': 'Tesla, Inc.', 'regularMarketChangePercent': 22.68999, 'regularMarketPrice': 272.2, 'displayName': 'Tesla', 'trailingPegRatio': 3.3072}
+📤 Output: Here is the detailed financial data for Tesla (TSLA):
+
+- **Current Price**: $272.20
+- **52-Week Range**: $138.80 - $488.54
+- **Market Cap**: $875.54 Billion
+- **P/E Ratio**: 133.43
+- **Analyst Recommendations**: 
+  - Strong Buy: 7
+  - Buy: 16
+  - Hold: 14
+  - Sell: 9
+  - Strong Sell: 2
+
+Tesla, Inc. designs, develops, manufactures, leases, and sells electric vehicles, and energy generation and storage systems in the United States, China, and internationally. The company operates in two segments, Automotive; and Energy Generation and Storage.
+
+I will now hand off to the TechnicalAgent for technical analysis.
+🛠️  Planning to use tools: ['handoff']
+🔨 Calling Tool: handoff
+  With arguments: {'to_agent': 'TechnicalAgent', 'reason': 'To perform technical analysis on Tesla (TSLA) stock.'}
+🔧 Tool Result (handoff):
+  Arguments: {'to_agent': 'TechnicalAgent', 'reason': 'To perform technical analysis on Tesla (TSLA) stock.'}
+  Output: Agent TechnicalAgent is now handling the request due to the following reason: To perform technical analysis on Tesla (TSLA) stock..
+Please continue with the current request.
+
+==================================================
+🤖 Agent: TechnicalAgent
+==================================================
+
+🛠️  Planning to use tools: ['TechnicalAnalysis']
+🔨 Calling Tool: TechnicalAnalysis
+  With arguments: {'symbol': 'TSLA'}
+🔧 Tool Result (TechnicalAnalysis):
+  Arguments: {'symbol': 'TSLA'}
+  Output: Technical trend is Bearish based on MA crossover.
+🛠️  Planning to use tools: ['handoff']
+🔨 Calling Tool: handoff
+  With arguments: {'to_agent': 'RiskAgent', 'reason': 'To evaluate the investment risk for Tesla (TSLA) using beta and volatility.'}
+🔧 Tool Result (handoff):
+  Arguments: {'to_agent': 'RiskAgent', 'reason': 'To evaluate the investment risk for Tesla (TSLA) using beta and volatility.'}
+  Output: Agent RiskAgent is now handling the request due to the following reason: To evaluate the investment risk for Tesla (TSLA) using beta and volatility..
+Please continue with the current request.
+
+==================================================
+🤖 Agent: RiskAgent
+==================================================
+
+🛠️  Planning to use tools: ['RiskRating']
+🔨 Calling Tool: RiskRating
+  With arguments: {'symbol': 'TSLA'}
+🔧 Tool Result (RiskRating):
+  Arguments: {'symbol': 'TSLA'}
+  Output: Beta: 2.58, Volatility Assessment: high
+🛠️  Planning to use tools: ['handoff']
+🔨 Calling Tool: handoff
+  With arguments: {'to_agent': 'AggregatorAgent', 'reason': 'To combine all analysis components into a final report for Tesla (TSLA).'}
+🔧 Tool Result (handoff):
+  Arguments: {'to_agent': 'AggregatorAgent', 'reason': 'To combine all analysis components into a final report for Tesla (TSLA).'}
+  Output: Agent AggregatorAgent is now handling the request due to the following reason: To combine all analysis components into a final report for Tesla (TSLA)..
+Please continue with the current request.
+
+==================================================
+🤖 Agent: AggregatorAgent
+==================================================
+
+🛠️  Planning to use tools: ['AggregateAnalysis']
+🔨 Calling Tool: AggregateAnalysis
+  With arguments: {'search_results': '1. Tesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick\n2. Tesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound\n3. Tesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies\n4. Tesla’s February Sales Plunge 26% in France as 2025 Struggles Continue\n5. Tesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X\n6. Tesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics\n7. Trump suspends $5B EV charger funding. These stocks are falling.\n8. Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities\n9. Tesla (TSLA) Sales in Germany Plummet by 59%\n10. Tesla (TSLA) Reignites Price War in China with Insurance Subsidy', 'sentiment_results': 'Error encountered during sentiment analysis.', 'technical_analysis': 'Technical trend is Bearish based on MA crossover.', 'risk_rating': 'Beta: 2.58, Volatility Assessment: high'}
+🔧 Tool Result (AggregateAnalysis):
+  Arguments: {'search_results': '1. Tesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick\n2. Tesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound\n3. Tesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies\n4. Tesla’s February Sales Plunge 26% in France as 2025 Struggles Continue\n5. Tesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X\n6. Tesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics\n7. Trump suspends $5B EV charger funding. These stocks are falling.\n8. Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities\n9. Tesla (TSLA) Sales in Germany Plummet by 59%\n10. Tesla (TSLA) Reignites Price War in China with Insurance Subsidy', 'sentiment_results': 'Error encountered during sentiment analysis.', 'technical_analysis': 'Technical trend is Bearish based on MA crossover.', 'risk_rating': 'Beta: 2.58, Volatility Assessment: high'}
+  Output: aggregate_stock_analysis() missing 1 required positional argument: 'finance_data'
+📤 Output: It seems there was an error in aggregating the analysis due to missing financial data. Let me correct this by including the financial data and then proceed with the aggregation.
+🛠️  Planning to use tools: ['AggregateAnalysis']
+🔨 Calling Tool: AggregateAnalysis
+  With arguments: {'search_results': '1. Tesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick\n2. Tesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound\n3. Tesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies\n4. Tesla’s February Sales Plunge 26% in France as 2025 Struggles Continue\n5. Tesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X\n6. Tesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics\n7. Trump suspends $5B EV charger funding. These stocks are falling.\n8. Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities\n9. Tesla (TSLA) Sales in Germany Plummet by 59%\n10. Tesla (TSLA) Reignites Price War in China with Insurance Subsidy', 'sentiment_results': 'Error encountered during sentiment analysis.', 'technical_analysis': 'Technical trend is Bearish based on MA crossover.', 'risk_rating': 'Beta: 2.58, Volatility Assessment: high', 'finance_data': {'current_price': 272.2, 'market_cap': 875536777216, 'pe_ratio': 133.43, 'analyst_recommendations': {'strong_buy': 7, 'buy': 16, 'hold': 14, 'sell': 9, 'strong_sell': 2}, '52_week_range': '138.80 - 488.54'}}
+🔧 Tool Result (AggregateAnalysis):
+  Arguments: {'search_results': '1. Tesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick\n2. Tesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound\n3. Tesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies\n4. Tesla’s February Sales Plunge 26% in France as 2025 Struggles Continue\n5. Tesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X\n6. Tesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics\n7. Trump suspends $5B EV charger funding. These stocks are falling.\n8. Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities\n9. Tesla (TSLA) Sales in Germany Plummet by 59%\n10. Tesla (TSLA) Reignites Price War in China with Insurance Subsidy', 'sentiment_results': 'Error encountered during sentiment analysis.', 'technical_analysis': 'Technical trend is Bearish based on MA crossover.', 'risk_rating': 'Beta: 2.58, Volatility Assessment: high', 'finance_data': {'current_price': 272.2, 'market_cap': 875536777216, 'pe_ratio': 133.43, 'analyst_recommendations': {'strong_buy': 7, 'buy': 16, 'hold': 14, 'sell': 9, 'strong_sell': 2}, '52_week_range': '138.80 - 488.54'}}
+  Output: Aggregation completed
+📤 Output: Here is the comprehensive analysis for Tesla (TSLA):
+
+### Recent News Headlines:
+1. Tesla (NASDAQ:TSLA) Jumps as Morgan Stanley’s Adam Jonas Names Stock Top Pick
+2. Tesla (TSLA) Stock Rises as Morgan Stanley Predicts Rebound
+3. Tesla (TSLA) Faces Sales Decline in Scandinavia Amid Political Controversies
+4. Tesla’s February Sales Plunge 26% in France as 2025 Struggles Continue
+5. Tesla Design Exec Says EV Giant Looking To Add Tech From Upcoming Roadster To Model S, X
+6. Tesla’s Financial Challenges and Opportunities: A Hold Rating Amidst Market Dynamics
+7. Trump suspends $5B EV charger funding. These stocks are falling.
+8. Tesla (TSLA) was downgraded to a Sell Rating at Phillip Securities
+9. Tesla (TSLA) Sales in Germany Plummet by 59%
+10. Tesla (TSLA) Reignites Price War in China with Insurance Subsidy
+
+### Sentiment Analysis:
+- Error encountered during sentiment analysis.
+
+### Financial Data:
+- **Current Price**: $272.20
+- **Market Cap**: $875.54 Billion
+- **P/E Ratio**: 133.43
+- **52-Week Range**: $138.80 - $488.54
+- **Analyst Recommendations**: 
+  - Strong Buy: 7
+  - Buy: 16
+  - Hold: 14
+  - Sell: 9
+  - Strong Sell: 2
+
+### Technical Analysis:
+- Technical trend is Bearish based on MA crossover.
+
+### Risk Assessment:
+- **Beta**: 2.58
+- **Volatility Assessment**: High
+
+### Overall Analysis:
+Tesla's stock is currently experiencing a bearish technical trend with high volatility. The financial metrics indicate a high P/E ratio, suggesting the stock might be overvalued. Analyst recommendations are mixed, with a significant number of holds and sells. Recent news highlights both positive and negative developments, including sales declines in certain regions and strategic moves by the company. Investors should consider these factors carefully when evaluating Tesla's stock.
+
+Done! Enter another or type 'exit' to quit.
+
+Enter a stock symbol or company name (e.g., AAPL, TSLA):
+ > exit
+
+Thanks for using the Stock Market Analyst. Goodbye!

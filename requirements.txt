@@ -1,0 +1,6 @@
+llama-index==0.12.33
+llama-index-llms-ollama
+llama-index-tools-mcp
+llama-index-llms-openai
+python-dotenv==1.1.0
+docker==7.1.0
