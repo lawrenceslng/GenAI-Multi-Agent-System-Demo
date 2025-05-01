@@ -1,0 +1,34 @@
+{
+  "main_objective": "Create an intelligent content curation agent that automatically gathers, analyzes, and summarizes trending articles from multiple online sources to generate a daily digest for users.",
+  "creative_idea": {
+    "summary": "Develop a multi-functional agent that uses custom Python tools to scrape news websites, filter articles based on relevance and popularity, and then utilize an MCP server with Playwright to automate browser interactions for dynamic content extraction. The agent then summarizes the curated articles and compiles a personalized daily newsletter.",
+    "why_interesting": "This approach combines web scraping, data filtering, and browser automation to solve a real-world problem\u2014automated content curation\u2014demonstrating multi-agent collaboration and advanced tool integration. It showcases how AI can assist in information overload scenarios, making it both practical and innovative."
+  },
+  "required_tasks": [
+    {
+      "type": "code",
+      "description": "Implement three Python functions as tools: (1) fetch_articles() to scrape articles from specified news sites, (2) filter_articles() to select top trending articles based on keywords and popularity metrics, (3) summarize_article() to generate concise summaries of each article.",
+      "priority": 1
+    },
+    {
+      "type": "code",
+      "description": "Set up an MCP server with Playwright to automate browsing for dynamically loaded content and extract full article texts that are not accessible via static scraping.",
+      "priority": 2
+    },
+    {
+      "type": "code",
+      "description": "Build an agent that orchestrates these tools: calls fetch_articles(), uses the MCP server to handle dynamic content, filters and summarizes articles, then compiles the results into a formatted digest.",
+      "priority": 1
+    },
+    {
+      "type": "documentation",
+      "description": "Document the architecture, explaining how each tool interacts within the agent, including data flow and decision logic.",
+      "priority": 3
+    },
+    {
+      "type": "presentation",
+      "description": "Prepare a demo and presentation showcasing the agent in action\u2014fetching, filtering, summarizing, and generating the daily digest\u2014highlighting the multi-agent collaboration and tool integration.",
+      "priority": 4
+    }
+  ]
+}

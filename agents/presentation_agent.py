@@ -6,6 +6,7 @@ Responsible for creating presentations based on code and documentation outputs
 import json
 import os
 import re
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 import pprint
 import traceback
@@ -20,6 +21,8 @@ from llama_index.tools.mcp import McpToolSpec, BasicMCPClient
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
+
+llm = OpenAI(model="gpt-4.1-nano-2025-04-14", api_key=os.getenv("OPENAI_API_KEY"))
 
 class PresentationAgent:
     """Agent responsible for creating presentations from coding assignments."""
@@ -606,6 +609,38 @@ def handle_task(task_description: str) -> str:
         }
         # Return the error info as JSON
         return json.dumps(error_result, indent=2)
+
+# Create the Presentation Agent with LlamaIndex
+presentation_agent = FunctionAgent(
+    name="PresentationAgent",
+    description="Generates Google Slides for a code repository",
+    system_prompt="""You are an expert Python programmer that generates and tests code for assignments.
+    
+    Your primary tools:
+    - AnalyzeRequirements: Extract coding requirements from assignment descriptions
+    - GenerateCode: Create Python code that meets the requirements
+    - TestCode: Run and test the code in a secure Docker sandbox
+    
+    When generating code:
+    1. Always start by analyzing and breaking down the requirements
+    2. Generate well-structured, documented Python code
+    3. Include proper error handling and type hints
+    4. Add appropriate unit tests
+    5. Test the code in the Docker sandbox
+    
+    Based on the results, you should:
+    1. If tests pass, provide the code and test results
+    2. If tests fail, analyze the errors and revise the code
+    3. Ask for clarification if requirements are unclear
+    
+    Always ensure code is secure and follows best practices.""",
+    tools=[
+        FunctionTool.from_defaults(fn=handle_task, name="HandlePresentationTask")
+    ],
+    llm=llm,
+    verbose=True
+)
+
 
 if __name__ == "__main__":
     # For testing the agent directly

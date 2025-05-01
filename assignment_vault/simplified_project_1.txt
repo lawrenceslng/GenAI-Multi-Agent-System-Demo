@@ -1,0 +1,7 @@
+Assignment: Domain-Specific LLM Chat Server (10%)
+
+Deliverables due: Thu Feb 13, 8:00am
+
+For this assignment, you will create a simple domain-specific LLM chat server using LiteLLM and FastAPI. Your server should expose an endpoint that accepts a user query and returns a response from an LLM.
+
+You will present a quick 5-minute demo of your chat server during lecture on Thu Feb 13. Please submit your code to your lab02 GitHub repo and include instructions in your README.md.

@@ -1,0 +1,25 @@
+ORIGINAL ASSIGNMENT:
+Agents (10%)
+Deliverables due Thu Apr 10th 8:00am
+Demo and presentation in class on Thu Apr 10th
+Part 1 - Functions as Tools
+
+Build a tool calling Agent using LlamaIndex that consists of at least 3 python functions or methods as tools. You can, for example, create a data structure and operations on the data structure (like a tree). Or, you can pick a Python Library, like os or shutils and expose methods as operations. Show how the Agent can use the tools to solve a problem or perform a task with the tools.
+Part 2 - MCP
+
+Pick one or more MCP Servers that to build an Agent that can interact with a more sophisticated tool, like the MCP Playwright tool. See the following page for a list of possible MCP Servers:
+
+https://github.com/modelcontextprotocol/servers
+Part 3 - Build a Useful Agent or Multi-Agent System
+
+Combining what you learned in Part 1 and Part 2, pick a more ambitious problem to solve. See how far you can get with your Agent.
+
+Another option to build out a multi-agent system.
+
+Be creative.
+
+CREATIVE IMPLEMENTATION IDEA:
+Develop a multi-functional agent that uses custom Python tools to scrape news websites, filter articles based on relevance and popularity, and then utilize an MCP server with Playwright to automate browser interactions for dynamic content extraction. The agent then summarizes the curated articles and compiles a personalized daily newsletter.
+
+WHY THIS IS INTERESTING:
+This approach combines web scraping, data filtering, and browser automation to solve a real-world problem—automated content curation—demonstrating multi-agent collaboration and advanced tool integration. It showcases how AI can assist in information overload scenarios, making it both practical and innovative.

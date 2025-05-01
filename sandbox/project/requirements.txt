@@ -1,0 +1,7 @@
+llama_index
+mcp_server_sdk
+playwright
+beautifulsoup4
+requests
+nltk or spaCy (for summarization)
+asyncio
