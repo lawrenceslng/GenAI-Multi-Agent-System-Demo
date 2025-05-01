@@ -1,139 +1,165 @@
-# main.py
-
 import asyncio
 import requests
 from bs4 import BeautifulSoup
-import matplotlib.pyplot as plt
-from llama_index import GPTIndex, ServiceContext, LLMPredictor
-from mcp_client import MCPClient
 from playwright.async_api import async_playwright
-from typing import List, Dict, Any, Optional
+from llama_index import GPTSimpleVectorIndex, Document
+from mcp_server_sdk import MCPClient
+import spacy
+from typing import List, Dict, Optional
 
-class WebContentRetriever:
-    """Class to retrieve web content using requests and Playwright."""
-    @staticmethod
-    def fetch_page_content(url: str) -> Optional[str]:
-        """Fetches page content using requests."""
-        try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            return response.text
-        except requests.RequestException as e:
-            print(f"Error fetching {url}: {e}")
-            return None
+# Load spaCy model for summarization
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    # If the model isn't installed, provide instructions or handle accordingly
+    raise RuntimeError("spaCy model 'en_core_web_sm' not found. Please install it with: python -m spacy download en_core_web_sm")
 
-    @staticmethod
-    async def fetch_dynamic_content(url: str) -> Optional[str]:
-        """Fetches dynamic page content using Playwright."""
+class ContentScraper:
+    """
+    A class to scrape and filter web content.
+    """
+
+    def __init__(self, mcp_client: MCPClient):
+        self.mcp_client = mcp_client
+
+    async def fetch_page(self, url: str) -> Optional[str]:
+        """
+        Fetch the HTML content of a webpage asynchronously.
+        """
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch()
                 page = await browser.new_page()
-                await page.goto(url, timeout=10000)
+                await page.goto(url)
                 content = await page.content()
                 await browser.close()
                 return content
         except Exception as e:
-            print(f"Error fetching dynamic content from {url}: {e}")
+            print(f"Error fetching page {url}: {e}")
             return None
 
-class KeyPointExtractor:
-    """Class to extract key points from web content."""
-    @staticmethod
-    def extract_key_points(html_content: str, max_points: int = 5) -> List[str]:
-        """Extracts key points from HTML content."""
+    def parse_html(self, html: str) -> str:
+        """
+        Parse HTML content to extract main text.
+        """
         try:
-            soup = BeautifulSoup(html_content, 'html.parser')
-            text = soup.get_text()
-            sentences = text.split('.')
-            key_points = [sentence.strip() for sentence in sentences if len(sentence.strip()) > 20]
-            return key_points[:max_points]
+            soup = BeautifulSoup(html, 'html.parser')
+            # Example: extract all paragraph texts
+            paragraphs = soup.find_all('p')
+            text = ' '.join(p.get_text() for p in paragraphs)
+            return text
         except Exception as e:
-            print(f"Error extracting key points: {e}")
-            return []
+            print(f"Error parsing HTML: {e}")
+            return ""
 
-class Visualizer:
-    """Class to visualize data."""
-    @staticmethod
-    def plot_key_points(key_points: List[str]) -> None:
-        """Plots key points as a bar chart."""
+    def filter_content(self, text: str, keywords: List[str]) -> bool:
+        """
+        Filter content based on presence of keywords.
+        """
+        return any(keyword.lower() in text.lower() for keyword in keywords)
+
+class Summarizer:
+    """
+    A class to summarize text content.
+    """
+
+    def __init__(self):
+        pass
+
+    def summarize(self, text: str, max_sentences: int = 3) -> str:
+        """
+        Generate a simple extractive summary.
+        """
         try:
-            labels = [f"Point {i+1}" for i in range(len(key_points))]
-            values = [len(point) for point in key_points]
-            plt.figure(figsize=(8, 4))
-            plt.bar(labels, values)
-            plt.xlabel('Key Points')
-            plt.ylabel('Text Length')
-            plt.title('Key Point Lengths')
-            plt.tight_layout()
-            plt.show()
+            doc = nlp(text)
+            sentences = list(doc.sents)
+            # Select first N sentences as summary
+            summary_sentences = sentences[:max_sentences]
+            summary = ' '.join([sent.text for sent in summary_sentences])
+            return summary
         except Exception as e:
-            print(f"Error during visualization: {e}")
+            print(f"Error during summarization: {e}")
+            return ""
 
-class ResearchAgent:
-    """Main agent class to coordinate web retrieval, processing, and reporting."""
-    def __init__(self, mcp_server_url: str):
-        self.mcp_client = MCPClient(mcp_server_url)
-        self.service_context = self._create_service_context()
+class NewsletterAgent:
+    """
+    Main agent to orchestrate scraping, filtering, summarizing, and content curation.
+    """
 
-    def _create_service_context(self) -> ServiceContext:
-        """Creates a llama_index ServiceContext with a simple predictor."""
-        predictor = LLMPredictor()
-        return ServiceContext.from_defaults(llm_predictor=predictor)
+    def __init__(self, mcp_server_url: str, keywords: List[str]):
+        self.mcp_client = MCPClient(server_url=mcp_server_url)
+        self.scraper = ContentScraper(self.mcp_client)
+        self.summarizer = Summarizer()
+        self.keywords = keywords
 
-    def perform_research(self, url: str) -> Dict[str, Any]:
-        """Performs research on a given URL."""
-        content = WebContentRetriever.fetch_page_content(url)
-        if not content:
-            print(f"Failed to retrieve content from {url}")
-            return {}
-
-        key_points = KeyPointExtractor.extract_key_points(content)
+    async def process_article(self, url: str) -> Optional[Dict]:
+        """
+        Fetch, filter, and summarize an article.
+        """
+        html = await self.scraper.fetch_page(url)
+        if not html:
+            return None
+        text = self.scraper.parse_html(html)
+        if not self.scraper.filter_content(text, self.keywords):
+            return None
+        summary = self.summarizer.summarize(text)
         return {
             'url': url,
-            'key_points': key_points,
-            'content': content
+            'summary': summary
         }
 
-    def generate_report(self, research_data: Dict[str, Any]) -> None:
-        """Generates a report based on research data."""
-        url = research_data.get('url')
-        key_points = research_data.get('key_points', [])
-        print(f"Research Report for {url}")
-        for idx, point in enumerate(key_points, 1):
-            print(f"{idx}. {point}")
+    async def curate_content(self, urls: List[str]) -> List[Dict]:
+        """
+        Process multiple URLs concurrently.
+        """
+        tasks = [self.process_article(url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        # Filter out None results
+        return [res for res in results if res]
 
-        # Visualize key points
-        Visualizer.plot_key_points(key_points)
+    def build_index(self, articles: List[Dict]) -> GPTSimpleVectorIndex:
+        """
+        Build a vector index from summarized articles.
+        """
+        documents = [Document(text=article['summary'], extra_info={'url': article['url']}) for article in articles]
+        index = GPTSimpleVectorIndex.from_documents(documents)
+        return index
 
-    def interact_with_mcp(self, command: str) -> Any:
-        """Send command to MCP server and get response."""
+    def generate_newsletter(self, index: GPTSimpleVectorIndex) -> str:
+        """
+        Generate a newsletter summary from the index.
+        """
         try:
-            response = self.mcp_client.send_command(command)
-            return response
+            # Example: retrieve top 3 articles
+            top_docs = index.query("Summarize the latest articles", top_k=3)
+            newsletter_content = "\n\n".join([doc.text for doc in top_docs])
+            return newsletter_content
         except Exception as e:
-            print(f"Error communicating with MCP server: {e}")
-            return None
+            print(f"Error generating newsletter: {e}")
+            return ""
 
 async def main():
-    """Main execution function."""
-    mcp_server_url = "http://localhost:8000"  # Replace with actual MCP server URL
-    agent = ResearchAgent(mcp_server_url)
+    """
+    Main execution function.
+    """
+    # Example configuration
+    mcp_server_url = "http://localhost:8000"
+    target_urls = [
+        "https://example.com/article1",
+        "https://example.com/article2",
+        "https://example.com/article3"
+    ]
+    keywords = ["technology", "science", "innovation"]
 
-    # Example URL to research
-    url = "https://example.com"
-
-    # Perform web content retrieval and processing
-    research_data = agent.perform_research(url)
-
-    if research_data:
-        # Generate report
-        agent.generate_report(research_data)
-
-        # Example interaction with MCP server
-        command = "perform_web_automation for research report"
-        response = agent.interact_with_mcp(command)
-        print(f"MCP Response: {response}")
+    agent = NewsletterAgent(mcp_server_url, keywords)
+    articles = await agent.curate_content(target_urls)
+    if not articles:
+        print("No articles matched the filtering criteria.")
+        return
+    index = agent.build_index(articles)
+    newsletter = agent.generate_newsletter(index)
+    print("Generated Newsletter:\n")
+    print(newsletter)
 
 if __name__ == "__main__":
     asyncio.run(main())

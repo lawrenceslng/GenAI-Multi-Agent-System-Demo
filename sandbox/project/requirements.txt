@@ -1,6 +1,7 @@
 llama_index
-requests
-beautifulsoup4
-matplotlib
+mcp_server_sdk
 playwright
-mcp_client
+beautifulsoup4
+requests
+nltk or spaCy (for summarization)
+asyncio

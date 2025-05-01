@@ -8,14 +8,16 @@ import os
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
+import re
 
 from llama_index.core.agent.workflow import FunctionAgent, AgentWorkflow
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 from llama_index.llms.openrouter import OpenRouter
 from llama_index.core.workflow import Context
+from llama_index.tools.mcp import BasicMCPClient, McpToolSpec
 
 load_dotenv()
 
@@ -33,15 +35,20 @@ def setup_logging(logger_name: str = "code_agent") -> logging.Logger:
     
     return logger
 
-# Initialize LLM
+# Initialize LLM and MCP Client
 llm = OpenAI(model="gpt-4.1-nano-2025-04-14", api_key=os.getenv("OPENAI_API_KEY"))
 
-# llm = OpenRouter(
-    # api_key=os.getenv("OPENROUTER_API_KEY"),
-    # max_tokens=256,
-    # context_window=4096,
-    # model="google/gemini-2.0-flash-exp:free",
-# )
+# Initialize Github MCP client
+# Set up logger for MCP initialization
+logger = setup_logging("github_mcp")
+github_mcp_client = BasicMCPClient(
+    command_or_url=os.getenv("GITHUB_MCP_URL"),
+    args=["stdio"],
+    env={
+        "GITHUB_PERSONAL_ACCESS_TOKEN": os.getenv("GITHUB_PAT")
+    }
+)
+github_mcp_tool = McpToolSpec(client=github_mcp_client)
 
 class CodeAgent:
     def __init__(self, logger: Optional[logging.Logger] = None):
@@ -140,27 +147,129 @@ async def handle_task(ctx: Context) -> str:
         logger = setup_logging()
         logger.info("Starting code agent task")
         
-        # Create agent instance
-        agent = CodeAgent(logger=logger)
+        # Get the agent instance
+        agent_instance = await get_code_agent()
+
+        # Create code agent instance
+        code_agent = CodeAgent(logger=logger)
         
         # Read instructions
-        instructions = agent.read_instructions()
+        instructions = code_agent.read_instructions()
         logger.info("Read instructions successfully")
         
         # Analyze requirements
-        requirements = await agent.analyze_requirements(instructions)
+        requirements = await code_agent.analyze_requirements(instructions)
         logger.info("Requirements analyzed")
         
         # Generate code files
-        generated_files = await agent.generate_code(requirements)
+        generated_files = await code_agent.generate_code(requirements)
         logger.info("Code files generated")
+        
+        # Create Github repository
+        try:
+            repo_name = f"coding-assignment-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            
+            # Get Github tools
+            logger.info("Initializing Github MCP tools...")
+            github_tools = await github_mcp_tool.to_tool_list_async()
+            if not github_tools:
+                raise Exception("No tools returned from Github MCP server")
+            
+            # Log available tools
+            tool_names = [t._metadata.name for t in github_tools if hasattr(t, '_metadata') and hasattr(t._metadata, 'name')]
+            logger.info(f"Retrieved {len(github_tools)} tools from Github MCP server")
+            logger.info(f"Available tools: {', '.join(tool_names)}")
+            
+            # Verify required tools are available
+            required_tools = ['create_repository', 'create_or_update_file']
+            missing_tools = [tool for tool in required_tools if tool not in tool_names]
+            if missing_tools:
+                raise Exception(f"Missing required tools: {', '.join(missing_tools)}. Available tools: {', '.join(tool_names)}")
+            
+            # Get required tool instances
+            create_repo_tool = next(t for t in github_tools if hasattr(t, '_metadata') and hasattr(t._metadata, 'name') and t._metadata.name == "create_repository")
+            create_file_tool = next(t for t in github_tools if hasattr(t, '_metadata') and hasattr(t._metadata, 'name') and t._metadata.name == "create_or_update_file")
+            logger.info("Required Github tools found")
+            
+            # Create repository
+            response = await create_repo_tool.acall(name=repo_name, private=False)
+            if not hasattr(response, 'content') or not response.content:
+                raise Exception(f"Unexpected repository creation response format: {response}")
+            
+            print(response)
+            print(type(response))
+            print('-'*50)
+            print(response.content)
+            print(type(response.content))
+            print('-'*50)
+            print(response.raw_input)
+            print(type(response.raw_input))
+            print('-'*50)
+            print(response.raw_output)
+            print(type(response.raw_output))
+            
+            print('-'*50)
+            
+            # text_content = next((c for c in response.content if hasattr(c, 'type') and c.type == 'text'), None)
+            # text_content = next((c for c in response.content if c.type == 'text'), None)
+            # if not text_content:
+            #     raise Exception("No text content found in repository creation response")
+            
+            # Parse repository data
+            # repo_data = json.loads(response.content[0].text)
+            # repo_result = {'html_url': repo_data['html_url']}
+            # logger.info(f"Repository created: {repo_result['html_url']}")
+
+            # Step 1: Use regex to extract the JSON part
+            match = re.search(r"text='({.*?})'", response.content)
+
+            if match:
+                json_string = match.group(1)  # the content inside `text='...'`
+                
+                # Step 2: Parse JSON
+                try:
+                    data = json.loads(json_string)
+                    repo_owner = data["owner"]["login"]
+                    repo_name = data["name"]
+                    repo_url = data["html_url"]
+                    print("Repo Owner:", repo_owner)
+                    print("Repo Name:", repo_name)
+                    print("Repo URL:", repo_url)
+                except json.JSONDecodeError as e:
+                    print("Error decoding JSON:", e)
+            else:
+                print("Could not find JSON content in the response.")
+            
+            for file_name, content in generated_files.items():
+                try:
+                    logger.info(f"Creating file: {file_name}")
+                    
+                    await create_file_tool.acall(
+                        owner=repo_owner,
+                        repo=repo_name,
+                        path=file_name,
+                        content=content,
+                        message=f"Add {file_name}",
+                        branch="main"
+                    )
+                    logger.info(f"File {file_name} created successfully")
+                except Exception as e:
+                    logger.error(f"Error creating file {file_name}: {str(e)}")
+                    continue
+            
+            logger.info("All files pushed successfully")
+            
+        except Exception as e:
+            logger.error(f"Github repository operation failed: {str(e)}")
+            raise
         
         # Prepare success response
         result = {
             "status": "success",
-            "message": "Code generation completed",
+            "message": "Code generation and Github push completed",
             "files_generated": list(generated_files.keys()),
-            "requirements": requirements
+            "requirements": requirements,
+            "github_repository": repo_url
         }
         logger.info("sending back result")
         return json.dumps(result, indent=2)
@@ -174,35 +283,53 @@ async def handle_task(ctx: Context) -> str:
         return json.dumps(error_result, indent=2)
 
 # Create the Code Agent with LlamaIndex
-code_agent = FunctionAgent(
-    name="CodeAgent",
-    description="Generates code based on assignment instructions",
-    system_prompt="""You are an expert Python programmer that generates code for assignments.
+async def create_agent():
+    # # Get Github tools
+    # github_tools = await github_mcp_tool.to_tool_list_async()
     
-    Your workflow:
-    1. Read instructions from the sandbox/instructions file
-    2. Analyze requirements and determine needed files
-    3. Generate code and save to sandbox/project directory
-    4. Return a status report
-    
-    Always ensure code is:
-    - Well-structured and documented
-    - Includes proper error handling
-    - Uses type hints
-    - Follows Python best practices""",
-    tools=[
-        FunctionTool.from_defaults(fn=handle_task, name="HandleCodingTask")
-    ],
-    llm=llm,
-    verbose=True
-)
+    return FunctionAgent(
+        name="CodeAgent",
+        description="Generates code based on assignment instructions and manages Github repositories",
+        system_prompt="""You are an expert Python programmer that generates code for assignments and manages Github repositories.
+        
+        Your workflow:
+        1. Read instructions from the sandbox/instructions file
+        2. Analyze requirements and determine needed files
+        3. Generate code and save to sandbox/project directory
+        4. Create a Github repository and push the code
+        5. Return a status report with repository URL
+        
+        Always ensure code is:
+        - Well-structured and documented
+        - Includes proper error handling
+        - Uses type hints
+        - Follows Python best practices
+        - Properly version controlled with Git""",
+        tools=[
+            FunctionTool.from_defaults(fn=handle_task, name="HandleCodingTask"),
+            # *github_tools
+        ],
+        llm=llm,
+        verbose=True
+    )
+
+# Create initial code agent instance
+code_agent = None
+
+async def get_code_agent():
+    """Get or create the code agent instance."""
+    global code_agent
+    if code_agent is None:
+        code_agent = await create_agent()
+    return code_agent
 
 if __name__ == "__main__":
     # For testing the agent directly
     import asyncio
     
     async def test_agent():
-        workflow = AgentWorkflow(agents=[code_agent], root_agent=code_agent.name)
+        agent = await get_code_agent()
+        workflow = AgentWorkflow(agents=[agent], root_agent=agent.name)
         context = Context(workflow=workflow)
         result = await handle_task(context)
         print(result)

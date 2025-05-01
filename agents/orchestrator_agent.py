@@ -16,7 +16,7 @@ from llama_index.llms.openai import OpenAI
 from llama_index.core.workflow import Context
 
 # Import specialized agents
-from sandbox.docker_code_agent import code_agent
+from sandbox.docker_code_agent import get_code_agent
 from agents.documentation_agent import documentation_agent
 from agents.presentation_agent import presentation_agent
 from agents.voiceover_agent import voiceover_agent
@@ -73,10 +73,12 @@ class OrchestratorAgent:
         except Exception as e:
             raise Exception(f"Error analyzing assignment: {str(e)}")
 
-    def get_agent_for_task(self, task_type: str):
+    async def get_agent_for_task(self, task_type: str):
         """Get the appropriate agent for a given task type."""
+        if task_type == TaskType.CODE.value:
+            return await get_code_agent()
+            
         agents = {
-            TaskType.CODE.value: code_agent,
             TaskType.DOCUMENTATION.value: documentation_agent,
             TaskType.PRESENTATION.value: presentation_agent,
             TaskType.VOICEOVER.value: voiceover_agent
@@ -85,7 +87,7 @@ class OrchestratorAgent:
 
     async def execute_task(self, task: Dict, context: Context) -> Dict:
         """Execute a single task using the appropriate agent."""
-        agent = self.get_agent_for_task(task["type"])
+        agent = await self.get_agent_for_task(task["type"])
         if not agent:
             raise ValueError(f"No agent found for task type: {task['type']}")
 
