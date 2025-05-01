@@ -1,3 +1,4 @@
 genai-mas-venv
 __pycache__
 env/
+.env
