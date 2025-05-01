@@ -1,0 +1,6 @@
+llama_index
+requests
+beautifulsoup4
+matplotlib
+playwright
+mcp_client
