@@ -22,7 +22,7 @@ from llama_index.core.workflow import Context
 from llama_index.core.tools import FunctionTool
 
 # Import agents
-from sandbox.docker_code_agent import handle_task, code_agent
+from agents.orchestrator_agent import handle_orchestration, orchestrator_agent
 
 llm = OpenAI(model="gpt-4.1-nano-2025-04-14", api_key=os.getenv("OPENAI_API_KEY"))
 # Initialize LLM
@@ -70,8 +70,8 @@ class AssignmentOrchestrator:
         try:
             # Create workflow and context
             workflow = AgentWorkflow(
-                agents=[code_agent],
-                root_agent=code_agent.name
+                agents=[orchestrator_agent],
+                root_agent=orchestrator_agent.name
             )
             context = Context(workflow=workflow)
             
@@ -82,7 +82,7 @@ class AssignmentOrchestrator:
             })
             
             # Call code agent's handle_task function
-            response = await handle_task(context)
+            response = await handle_orchestration(context)
             
             # Parse the response
             try:
