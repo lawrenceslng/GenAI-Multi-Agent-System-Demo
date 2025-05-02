@@ -1,8 +1,21 @@
 FROM python:3.10-slim
 
-COPY code_agent.py /code_agent.py
-COPY requirements.txt /requirements.txt
+# Create workspace directory for temporary code storage
+WORKDIR /workspace
 
-RUN pip install --no-cache-dir -r /requirements.txt
+# Copy agent code and requirements
+COPY docker_code_agent.py /app/docker_code_agent.py
+COPY requirements.txt /app/requirements.txt
 
-ENTRYPOINT ["python", "/code_agent.py"]
+# Install dependencies
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Create non-root user for security
+RUN useradd -m -u 1000 codeagent && \
+    chown -R codeagent:codeagent /workspace
+
+# Switch to non-root user
+USER codeagent
+
+# Set entrypoint
+ENTRYPOINT ["python", "/app/docker_code_agent.py"]
