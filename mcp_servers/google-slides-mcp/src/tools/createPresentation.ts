@@ -16,8 +16,14 @@ export const createPresentationTool = async (slides: slides_v1.Slides, args: Cre
         title: args.title,
       },
     });
+    // Return a simpler JSON object containing only the presentationId
+    const result = {
+      presentationId: response.data.presentationId,
+      title: response.data.title,
+    };
     return {
-      content: [{ type: 'text', text: JSON.stringify(response.data, null, 2) }],
+      // Return the simplified result as a JSON string in the text content
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
   } catch (error: unknown) {
     throw handleGoogleApiError(error, 'create_presentation');

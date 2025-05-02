@@ -1,71 +1,52 @@
-"""
-Presentation Agent for Multi-Agent Homework System
-Responsible for creating presentations based on code and documentation outputs
-"""
-
-import json
 import os
+import json
 import re
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-import pprint
-import traceback
+from typing import Dict, Any, List, Optional
 
-from llama_index.llms.openai import OpenAI
-from llama_index.core.llms import ChatMessage, MessageRole
-from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
-from llama_index.core.tools import FunctionTool, ToolOutput
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from llama_index.core.agent import ReActAgent
+from llama_index.core.tools import FunctionTool
+from llama_index.llms.openai import OpenAI
 from llama_index.tools.mcp import McpToolSpec, BasicMCPClient
+from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
+from llama_index.core.prompts import ChatMessage, MessageRole
 
-# Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = OpenAI(model="gpt-4.1-nano-2025-04-14", api_key=os.getenv("OPENAI_API_KEY"))
-
 class PresentationAgent:
-    """Agent responsible for creating presentations from coding assignments."""
+    """Agent responsible for creating presentations from coding assignments using tool-calling."""
     
     def __init__(self, model_name: str = "gpt-4o"):
-        """Initialize the presentation agent with specified LLM."""
-        # Initialize the LLM
-        self.api_key = os.getenv("OPENAI_API_KEY") 
+        """Initialize the presentation agent with specified LLM and tools."""
+        # Set up token counting
+        self.token_counter = TokenCountingHandler(tokenizer=None)
+        callback_manager = CallbackManager([self.token_counter])
+        
+        self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY not found in environment")
             
-        # Set up token counting
-        self.token_counter = TokenCountingHandler(
-            tokenizer=None  # will use default tiktoken
-        )
-        callback_manager = CallbackManager([self.token_counter])
-        
-        # Initialize LLM
         self.llm = OpenAI(
             model=model_name,
             api_key=self.api_key,
-            temperature=0.3,
             callback_manager=callback_manager
         )
         
-        # Initialize the Google Slides MCP tool
         self.slides_tool = self._init_slides_tool()
-        
-        # Initialize agent tools
         self.tools = self._create_tools()
         
-        # Create the agent
         self.agent = ReActAgent.from_tools(
             tools=self.tools,
             llm=self.llm,
             verbose=True,
-            system_prompt=self._get_system_prompt(),
+            system_prompt=self._get_system_prompt()
         )
-
+    
     def _init_slides_tool(self) -> Optional[McpToolSpec]:
         """Initialize Google Slides MCP tool."""
         try:
-            # Start the MCP server as a subprocess
             server_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
                 "mcp_servers/google-slides-mcp/build/index.js"
@@ -78,73 +59,119 @@ class PresentationAgent:
                     "--google-client-id", os.getenv("GOOGLE_CLIENT_ID"),
                     "--google-client-secret", os.getenv("GOOGLE_CLIENT_SECRET"),
                     "--google-refresh-token", os.getenv("GOOGLE_REFRESH_TOKEN")
-                ],
+                ]
             )
-
+            
             return McpToolSpec(client=slides_mcp_client)
         except Exception as e:
             print(f"Error initializing Google Slides MCP tool: {e}")
             return None
-
+    
     def _create_tools(self) -> List[FunctionTool]:
-        """Create tools for the presentation agent."""
+        """Create a set of tools for the presentation agent to use."""
         tools = []
-        
-        # Add custom analysis tool
-        analyze_content_tool = FunctionTool.from_defaults(
-            name="analyze_content",
-            description="Analyzes code and documentation to extract key points for presentation",
-            fn=self._analyze_content
-        )
-        tools.append(analyze_content_tool)
-        
-        # Add outline generation tool
+
         create_outline_tool = FunctionTool.from_defaults(
             name="create_presentation_outline",
-            description="Creates a structured outline for a presentation based on content analysis",
+            description="Creates a structured outline for a presentation based on pre-analyzed content.",
             fn=self._create_presentation_outline
         )
         tools.append(create_outline_tool)
-        
-        # Add Google Slides tools if available
-        if self.slides_tool:
-            # Get the tools from the spec
-            tools_list = self.slides_tool.to_tool_list()
-            tools.extend(tools_list)
-            
-        return tools
 
+        if self.slides_tool:
+            tools.extend(self.slides_tool.to_tool_list())
+
+        return tools
+    
     def _analyze_content(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
-        """Analyze code and documentation to extract key points for presentation."""
-        prompt = f"""
-        Please analyze the following code and documentation for a presentation:
+        """Analyze code and documentation in chunks to extract key points for presentation."""
+        # Process code in chunks if needed
+        code_chunks = self._chunk_text(code_content, max_chunk_size=1500)
+        doc_chunks = self._chunk_text(documentation_content, max_chunk_size=1500)
         
-        CODE:
-        ```python
-        {code_content[:3000]}  # Limit to prevent token overflow
-        ```
+        # First pass - analyze each chunk separately
+        code_analyses = []
+        for i, chunk in enumerate(code_chunks):
+            prompt = f"""
+            Please analyze part {i+1}/{len(code_chunks)} of the code:
+            
+            ```python
+            {chunk}
+            ```
+            
+            Identify key functions, patterns, or features in this section.
+            Keep your analysis brief and focused.
+            """
+            
+            messages = [ChatMessage(role=MessageRole.USER, content=prompt)]
+            response = self.llm.chat(messages)
+            code_analyses.append(response.message.content)
         
-        DOCUMENTATION:
-        {documentation_content[:3000]}  # Limit to prevent token overflow
+        doc_analyses = []
+        for i, chunk in enumerate(doc_chunks):
+            prompt = f"""
+            Please analyze part {i+1}/{len(doc_chunks)} of the code:
+            
+            ```python
+            {chunk}
+            ```
+            
+            Identify key functions, patterns, or features in this section.
+            Keep your analysis brief and focused.
+            """
+            
+            messages = [ChatMessage(role=MessageRole.USER, content=prompt)]
+            response = self.llm.chat(messages)
+            doc_analyses.append(response.message.content)
+        
+        synthesis_prompt = f"""
+        Based on the following analyses of code and documentation chunks, provide a comprehensive analysis:
+        
+        CODE ANALYSES:
+        {' '.join(code_analyses)}
+        
+        DOCUMENTATION ANALYSES:
+        {' '.join(doc_analyses if 'doc_analyses' in locals() else [])}
         
         Extract the following information for a presentation:
         1. Project title and one-line summary
         2. Main functionality and features (3-5 bullet points)
-        3. Technical approach and implementation details
-        4. Challenges and solutions
-        5. Key insights and learnings
-        6. Potential extensions or improvements
+        3. Technical approach and implementation details (as bullet points)
+        4. Challenges and solutions (as pairs of challenge and solution)
+        5. Key insights and learnings (as bullet points)
+        6. Potential extensions or improvements (as bullet points)
         
-        Format your response as a structured JSON object.
+        Format your response as a structured JSON object with the EXACT following keys:
+        - project_title (string)
+        - one_line_summary (string)
+        - main_functionality_and_features (array of strings)
+        - technical_approach_and_implementation_details (array of strings)
+        - challenges_and_solutions (array of strings, alternating challenges and solutions)
+        - key_insights_and_learnings (array of strings)
+        - potential_extensions_or_improvements (array of strings)
+        
+        Example format:
+        {{
+          "project_title": "Title Here",
+          "one_line_summary": "Summary here",
+          "main_functionality_and_features": ["Feature 1", "Feature 2"],
+          "technical_approach_and_implementation_details": ["Detail 1", "Detail 2"],
+          "challenges_and_solutions": [
+            "Challenge: Challenge 1",
+            "Solution: Solution 1",
+            "Challenge: Challenge 2",
+            "Solution: Solution 2"
+          ],
+          "key_insights_and_learnings": ["Insight 1", "Insight 2"],
+          "potential_extensions_or_improvements": ["Extension 1", "Extension 2"]
+        }}
+        
+        IMPORTANT: Make sure to use EXACTLY these JSON keys and maintain an array structure for each list.
         """
         
-        messages = [
-            ChatMessage(role=MessageRole.USER, content=prompt)
-        ]
-        
+        messages = [ChatMessage(role=MessageRole.USER, content=synthesis_prompt)]
         response = self.llm.chat(messages)
         
-        # Extract JSON from response
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response.message.content)
         if json_match:
             json_str = json_match.group(1)
@@ -154,63 +181,113 @@ class PresentationAgent:
         try:
             analysis = json.loads(json_str)
         except json.JSONDecodeError:
-            # Create structured output if JSON parsing fails
             analysis = {
-                "title": "Project Presentation",
-                "summary": "Overview of the coding project",
-                "main_features": ["Feature 1", "Feature 2", "Feature 3"],
-                "technical_approach": "Technical implementation details",
-                "challenges": ["Challenge 1", "Challenge 2"],
-                "solutions": ["Solution 1", "Solution 2"],
-                "key_insights": ["Insight 1", "Insight 2"],
-                "potential_extensions": ["Extension 1", "Extension 2"]
+                "project_title": "Project Presentation",
+                "one_line_summary": "Overview of the coding project",
+                "main_functionality_and_features": ["Feature 1", "Feature 2", "Feature 3"],
+                "technical_approach_and_implementation_details": ["Technical implementation detail 1", "Technical implementation detail 2"],
+                "challenges_and_solutions": [
+                    "Challenge: Implementation challenge 1",
+                    "Solution: Engineering solution 1",
+                    "Challenge: Implementation challenge 2",
+                    "Solution: Engineering solution 2"
+                ],
+                "key_insights_and_learnings": ["Insight 1", "Insight 2"],
+                "potential_extensions_or_improvements": ["Extension 1", "Extension 2"]
             }
         
         return analysis
+        
+    def _chunk_text(self, text: str, max_chunk_size: int = 1500) -> List[str]:
+        """Split text into smaller chunks respecting line breaks where possible."""
+        chunks = []
+        lines = text.split('\n')
+        current_chunk = []
+        current_size = 0
+        
+        for line in lines:
+            if current_size + len(line) + 1 > max_chunk_size and current_chunk:
+                chunks.append('\n'.join(current_chunk))
+                current_chunk = []
+                current_size = 0
+            
+            current_chunk.append(line)
+            current_size += len(line) + 1
+        
+        if current_chunk:
+            chunks.append('\n'.join(current_chunk))
+        
+        return chunks
     
     def _create_presentation_outline(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
         """Create a structured presentation outline based on content analysis."""
-        # Extract data from analysis
-        title = analysis.get("title", "Project Presentation")
-        summary = analysis.get("summary", "")
-        features = analysis.get("main_features", [])
-        technical = analysis.get("technical_approach", "")
-        challenges = analysis.get("challenges", [])
-        solutions = analysis.get("solutions", [])
-        insights = analysis.get("key_insights", [])
-        extensions = analysis.get("potential_extensions", [])
+        title = analysis.get("project_title", "Project Presentation")
+        summary = analysis.get("one_line_summary", "")
+        features = analysis.get("main_functionality_and_features", [])
+        technical_details = analysis.get("technical_approach_and_implementation_details", [])
+        technical = "\n".join([f"• {item}" for item in technical_details]) if technical_details else ""
         
-        # Create slide outline
+        challenges_solutions = analysis.get("challenges_and_solutions", [])
+        challenges = []
+        solutions = []
+        
+        # Handle challenges and solutions more defensively
+        if isinstance(challenges_solutions, list):
+            # If challenges_solutions is already a simple list of strings, handle accordingly
+            if all(isinstance(item, str) for item in challenges_solutions):
+                for i, item in enumerate(challenges_solutions):
+                    if i % 2 == 0:  # Even items are challenges
+                        challenges.append(item)
+                    else:  # Odd items are solutions
+                        solutions.append(item)
+            else:
+                for item in challenges_solutions:
+                    if isinstance(item, dict):
+                        if "challenge" in item:
+                            challenges.append(str(item["challenge"]))
+                        if "solution" in item:
+                            solutions.append(str(item["solution"]))
+                    elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                        challenges.append(str(item[0]))
+                        solutions.append(str(item[1]))
+                    elif isinstance(item, str):
+                        if item.startswith("Challenge:"):
+                            challenges.append(item[10:].strip())
+                        elif item.startswith("Solution:"):
+                            solutions.append(item[9:].strip())
+        
+        insights = analysis.get("key_insights_and_learnings", [])
+        extensions = analysis.get("potential_extensions_or_improvements", [])
+        
         outline = {
             "title": title,
             "slides": [
                 {
                     "title": "Overview",
-                    "content": [summary] + ["• " + feature for feature in features],
-                    "speaker_notes": f"This presentation covers {title}. {summary} The main features include: " + 
-                                     ", ".join(features) + "."
+                    "content": [summary] + ["• " + feature for feature in features] if features else [summary],
+                    "speaker_notes": f"This presentation covers {title}. {summary}" +
+                                     (" The main features include various functionalities." if features else "")
                 },
                 {
                     "title": "Technical Approach",
-                    "content": [technical],
-                    "speaker_notes": f"Let me explain our technical approach. {technical}"
+                    "content": technical_details if isinstance(technical_details, list) else [technical],
+                    "speaker_notes": "Let me explain our technical approach and implementation details."
                 },
                 {
                     "title": "Challenges & Solutions",
-                    "content": ["Challenges:"] + ["• " + challenge for challenge in challenges] +
-                              ["Solutions:"] + ["• " + solution for solution in solutions],
-                    "speaker_notes": f"We encountered several challenges including: {', '.join(challenges)}. " +
-                                    f"Our solutions involved: {', '.join(solutions)}."
+                    "content": (["Challenges:"] + ["• " + challenge for challenge in challenges] +
+                              ["Solutions:"] + ["• " + solution for solution in solutions]) if challenges or solutions else ["No significant challenges encountered"],
+                    "speaker_notes": "We encountered several challenges and implemented solutions to address them."
                 },
                 {
                     "title": "Key Insights",
                     "content": ["• " + insight for insight in insights],
-                    "speaker_notes": f"The key insights from this project were: {', '.join(insights)}."
+                    "speaker_notes": "Here are the key insights and learnings from this project."
                 },
                 {
                     "title": "Future Work",
                     "content": ["• " + extension for extension in extensions],
-                    "speaker_notes": f"Looking ahead, we could extend this project by: {', '.join(extensions)}."
+                    "speaker_notes": "Looking ahead, there are several ways this project could be extended and improved."
                 },
                 {
                     "title": "Thank You!",
@@ -223,432 +300,230 @@ class PresentationAgent:
         return outline
     
     def _get_system_prompt(self) -> str:
-        """Get the system prompt for the presentation agent."""
+        """Define the system prompt that guides the agent's reasoning."""
         return """
-        You are an expert presentation creator tasked with generating compelling presentations for coding projects.
-        
-        Your goal is to:
-        1. Analyze code and documentation to extract key project information
-        2. Create a well-structured presentation outline
-        3. Generate professional slides using Google Slides (if available)
-        
-        Your presentations should:
-        - Be clear, concise, and engaging
-        - Highlight the most important aspects of the project
-        - Explain technical concepts in an accessible way
-        - Provide insights into challenges and solutions
-        - Include speaker notes for each slide
-        
-        Follow these steps:
-        1. Analyze the code and documentation using the analyze_content tool
-        2. Create a presentation outline using the create_presentation_outline tool
-        3. Generate slides using the tools from Google Slides MCP:
-           - create_presentation: Create a new presentation
-           - add_slide: Add slides to the presentation
-           - batch_update_presentation: For more complex slide modifications
-        
-        Be creative but professional in your presentation style. Use clear titles, concise bullet points,
-        and appropriate technical depth for the target audience.
+        You are an expert presentation creator specialized in generating compelling presentations for coding projects based on pre-analyzed content.
+
+        Your task is to create a professional presentation using the provided analysis results by following these steps SEQUENTIALLY:
+
+        1.  **Create Outline:** Use the `create_presentation_outline` tool.
+            *   Input: The analysis results provided in the user query.
+            *   Output: A structured outline containing a list of slides, each with `title`, `content` (as a list of strings), and `speaker_notes`.
+
+        2.  **Create Presentation:** Use the `create_presentation` tool.
+            *   Input: The `title` from the outline generated in Step 1.
+            *   Output: A JSON object containing the `presentationId`. **CRITICAL: You MUST capture this `presentationId` from the tool's response.**
+
+        3.  **Populate Slides:** Use the `batch_update_presentation` tool.
+            *   Input:
+                *   `presentationId`: The **exact** `presentationId` obtained from the output of Step 2.
+                *   `requests`: Construct an array of requests to perform the following actions **IN ORDER**:
+                    *   **a) Delete Default Slide:** Add a `deleteObject` request targeting the default first slide. You might need to get the ID of the first slide first using `getPresentation` or assume a common default ID pattern if the tool supports it (check tool description if unsure, otherwise skip deletion if too complex). If skipping deletion, ensure your first `createSlide` uses `insertionIndex: 0`.
+                    *   **b) Create and Populate Slides:** For **EACH** slide in the outline from Step 1:
+                        *   Create a `createSlide` request. Specify a layout (e.g., `TITLE_AND_BODY`). Use `placeholderIdMappings` to assign unique `objectId`s to the `TITLE` and `BODY` placeholders (e.g., `slide_1_title`, `slide_1_body`). Use `insertionIndex` to control slide order.
+                        *   Create an `insertText` request for the slide's `title`, targeting the `objectId` you assigned to the `TITLE` placeholder.
+                        *   Create a **SEPARATE** `insertText` request for the slide's `content`. **THIS STEP IS CRITICAL AND MUST NOT BE SKIPPED**. You must:
+                            *   Join the list of content strings with newlines (`\n`)
+                            *   Target the `objectId` you assigned to the `BODY` placeholder in your placeholderIdMappings
+                            *   Make sure this is a separate request from the title insertText request
+                        *   (Optional but recommended) Create an `updateShapeProperties` request to set the speaker notes, targeting the slide's notes page element (requires knowing its objectId, often related to the slideId). If unsure how, skip speaker notes for now.
+            *   Output: Confirmation that slides were updated.
+
+        **IMPORTANT RULES:**
+        *   Execute steps in order.
+        *   Use the **exact** `presentationId` from Step 2 in Step 3.
+        *   For Step 3b, ensure you generate **BOTH** `insertText` requests (title and body) for **EVERY** slide in the outline. Join body content list with newlines.
+        *   The most common mistake is forgetting to create a separate `insertText` request for the slide content or forgetting to target the correct placeholder ID for the body content.
+        *   When joining content strings with newlines, make sure they are all plain strings (not objects).
+        *   Explain your reasoning, especially how you construct the `requests` array for `batch_update_presentation`.
         """
-    
-    def create_google_slides(self, outline: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a Google Slides presentation based on the outline."""
-        presentation_id = None
-        results = {} # Initialize results dictionary
-        create_presentation_tool = None
-        batch_update_tool = None
+        
+    @retry(
+        wait=wait_exponential(multiplier=1, min=2, max=60),
+        stop=stop_after_attempt(5)
+    )
+    def _execute_llm_query(self, query: str):
+        """Execute LLM query with retry logic for rate limit errors."""
+        # Note: The agent handles its own token counting via the callback manager
+        return self.agent.chat(query) # Use chat for conversational interaction
 
-        # --- 1. Check if Slides Tool Spec is available ---
-        if not self.slides_tool:
-            print("--- ERROR: Google Slides MCP tool spec not initialized. ---")
-            return {"error": "Google Slides MCP tools not available"}
-
-        # --- 2. Retrieve Specific MCP Tools ---
-        try:
-            print("--- DEBUG: Retrieving Google Slides MCP tools ---")
-            tools = self.slides_tool.to_tool_list()
-            # Use next with a default of None and check after
-            create_presentation_tool = next((t for t in tools if t.metadata.name == "create_presentation"), None)
-            batch_update_tool = next((t for t in tools if t.metadata.name == "batch_update_presentation"), None)
-
-            if not create_presentation_tool:
-                print("--- ERROR: 'create_presentation' tool not found in MCP spec. ---")
-                return {"error": "Required 'create_presentation' Google Slides MCP tool not found"}
-            if not batch_update_tool:
-                print("--- ERROR: 'batch_update_presentation' tool not found in MCP spec. ---")
-                return {"error": "Required 'batch_update_presentation' Google Slides MCP tool not found"}
-            print("--- DEBUG: Google Slides MCP tools retrieved successfully ---")
-
-        except Exception as e:
-             print(f"--- ERROR: Exception while retrieving tools from McpToolSpec: {e} ---")
-             traceback.print_exc()
-             return {"error": f"Failed to retrieve tools from McpToolSpec: {e}"}
-
-        # --- 3. Create the Presentation using the Retrieved Tool ---
-        presentation_title = outline.get("title", "Project Presentation")
-        raw_create_output = None # For error reporting
-        create_response_str = None
-
-        try:
-            print(f"--- DEBUG: Calling create_presentation_tool with title: '{presentation_title}' ---")
-            # *** Use the retrieved tool ***
-            tool_output_object = create_presentation_tool(title=presentation_title)
-            raw_tool_output = tool_output_object # Store for potential error reporting
-            print(f"--- DEBUG: Raw output type from self.create_presentation_tool: {type(tool_output_object)} ---")
-
-            # --- Revised Handling V3: Regex Extraction ---
-            create_response_str = None # Initialize string variable
-            if isinstance(tool_output_object, ToolOutput):
-                print("--- DEBUG: create_presentation_tool returned ToolOutput ---")
-                content_value_str = tool_output_object.content # We know this is a string
-
-                print(f"--- DEBUG (Inspection): Type of ToolOutput.content: {type(content_value_str)} ---")
-                log_snippet_repr = repr(content_value_str[:300]) # Log prefix of the repr string
-                print(f"--- DEBUG (Inspection): Value of ToolOutput.content (string repr): {log_snippet_repr}... ---")
-
-                # Use regex to find the JSON part within text='{...}' inside the repr string
-                # This regex looks for text=' followed by { ... } ending just before ')]
-                match = re.search(r"text='(\{[\s\S]*?\})'\)\]$", content_value_str.strip()) # Added strip() for safety
-
-                if match:
-                    extracted_json_text = match.group(1) # Get the captured JSON block string
-                    # Basic check for validity
-                    if extracted_json_text.startswith('{') and extracted_json_text.endswith('}'):
-                        print("--- DEBUG: Extracted potential JSON using regex from ToolOutput.content repr ---")
-                        # Assign the extracted JSON string
-                        create_response_str = extracted_json_text
-                        # Note: json.loads handles standard JSON escapes like \n, \t, \\, \"
-                    else:
-                        print(f"--- WARNING: Regex match did not produce valid start/end braces. Match: {extracted_json_text[:100]}... ---")
-                        # Keep create_response_str as None
-                else:
-                    print("--- WARNING: Regex did not find expected JSON pattern in ToolOutput.content string repr. ---")
-                    # Keep create_response_str as None
-
-                # Check if extraction failed
-                if create_response_str is None:
-                    print(f"--- ERROR: Could not extract JSON string from ToolOutput.content using regex. Content was: {content_value_str} ---")
-                    return {"error": "Could not extract JSON string from ToolOutput content via regex", "response": content_value_str}
-            # --- *** END REVISED HANDLING V3 *** ---
-
-            elif isinstance(tool_output_object, str):
-                # This case is less likely now but kept as fallback
-                print("--- DEBUG: create_presentation_tool returned str directly ---")
-                create_response_str = tool_output_object
-            else:
-                # Handle unexpected return type immediately
-                print(f"--- ERROR: Unexpected return type from create_presentation tool: {type(tool_output_object)} ---")
-                return {"error": f"Unexpected return type: {type(tool_output_object)}", "response": repr(tool_output_object)}
-
-            # --- Now, ONLY proceed if we have a valid string ---
-            if create_response_str is not None and isinstance(create_response_str, str):
-                # (Rest of the json.loads logic remains the same)
-                log_snippet = create_response_str[:200].replace('\n', '\\n')
-                print(f"--- DEBUG: Attempting json.loads on string: '{log_snippet}...' ---")
-                try:
-                    create_response = json.loads(create_response_str)
-                    presentation_id = create_response.get("presentationId") # Use .get for safety
-                    if not presentation_id:
-                        print(f"--- ERROR: Failed to get presentationId from parsed JSON. JSON was: {create_response} ---")
-                        return {"error": "Failed to create presentation (no presentationId in response)", "response": create_response} # Return parsed JSON
-                    print(f"--- DEBUG: Successfully created presentation ID: {presentation_id} ---")
-                except json.JSONDecodeError as json_e:
-                    print(f"--- ERROR: JSONDecodeError parsing tool response: {json_e} ---")
-                    print(f"--- ERROR: String content that failed parsing: {create_response_str}") # Log the full string
-                    return {"error": "Invalid JSON response from create_presentation tool", "response": create_response_str} # Return raw string
-            else:
-                # This case signifies an error in the handling logic above if reached.
-                print("--- ERROR: create_response_str is not a valid string after tool call handling ---")
-                return {"error": "Failed to get a valid string response from create_presentation tool", "response": repr(tool_output_object)}
-
-        except Exception as e:
-            # Catch other potential errors during the tool call itself
-            print(f"--- ERROR: Exception during create_presentation tool call/processing: {e} ---")
-            traceback.print_exc() # Log the full traceback
-            raw_output_repr = repr(raw_create_output) if raw_create_output is not None else "N/A"
-            return {"error": f"Error calling/processing create_presentation_tool: {e}", "raw_output": raw_output_repr}
-
-        # --- Crucial Check: Ensure presentation_id was successfully obtained before proceeding ---
-        if not presentation_id:
-            print("--- ERROR: presentation_id not set after creation attempt, cannot proceed with slides ---")
-            # The specific error should have been returned above, but add a fallback.
-            return {"error": "Failed to obtain presentation ID, cannot add slides", "details": "Check previous logs for specific error during creation"}
-
-        # --- 4. Prepare and Send Batch Update Requests ---
-        print(f"--- DEBUG: Proceeding to build batch requests for presentation {presentation_id} ---")
-        slides = outline.get("slides", [])
-        # Initialize results *after* confirming presentation_id
-        results = {"presentation_id": presentation_id, "slides": []}
-
-        # Create batch requests for all slides (This part remains the same as your original logic)
-        batch_requests = []
-        for i, slide in enumerate(slides):
-            slide_title = slide.get("title", "")
-            # Join content lines, ensuring they are strings
-            content = "\n".join(map(str, slide.get("content", [])))
-            speaker_notes = slide.get("speaker_notes", "")
-
-            slide_obj_id = f"slide_{i+1}" # Use a consistent variable
-            title_obj_id = f"title_{i+1}"
-            body_obj_id = f"body_{i+1}"
-            notes_obj_id = f"notes_{i+1}"
-
-            # Create slide request
-            batch_requests.append({
-                "createSlide": {
-                    "objectId": slide_obj_id,
-                    "slideLayoutReference": {"predefinedLayout": "TITLE_AND_BODY"},
-                    "placeholderIdMappings": [
-                        {"layoutPlaceholder": {"type": "TITLE"}, "objectId": title_obj_id},
-                        {"layoutPlaceholder": {"type": "BODY"}, "objectId": body_obj_id}
-                    ]
-                }
-            })
-            # Add title text request
-            if slide_title: # Avoid inserting empty text
-                 batch_requests.append({"insertText": {"objectId": title_obj_id, "text": slide_title}})
-            # Add body text request
-            if content: # Avoid inserting empty text
-                batch_requests.append({"insertText": {"objectId": body_obj_id, "text": content}})
-            # Add speaker notes request if available
-            if speaker_notes:
-                batch_requests.append({
-                    "createSpeakerNotes": { # Simpler request if text comes after
-                         "slideObjectId": slide_obj_id,
-                         "objectId": notes_obj_id
-                     }
-                 })
-                batch_requests.append({
-                    "insertText": {
-                         "objectId": notes_obj_id,
-                         "text": speaker_notes,
-                         "insertionIndex": 0 # Start inserting at the beginning of notes textbox
-                     }
-                 })
-                # Note: The original `createSpeakerNotesWithText` is fine too, this is just an alternative structure.
-
-            results["slides"].append({
-                "title": slide_title,
-                "slide_id": slide_obj_id, # Use the variable
-                "status": "pending"
-            })
-
-        # Send the batch update if requests were generated
-        if batch_requests:
-            print(f"--- DEBUG: Sending {len(batch_requests)} batch requests for presentation {presentation_id} ---")
-            batch_response_str = None
-            raw_batch_output = None
-            try:
-                # Call the retrieved batch update tool
-                batch_tool_output_or_str = batch_update_tool(
-                    presentationId=presentation_id,
-                    requests=batch_requests
-                )
-                raw_batch_output = batch_tool_output_or_str
-                print(f"--- DEBUG: Raw output type from batch_update_tool: {type(batch_tool_output_or_str)} ---")
-
-                # Handle ToolOutput vs str for batch_update_tool response
-                if isinstance(batch_tool_output_or_str, ToolOutput):
-                    print("--- DEBUG: batch_update_tool returned ToolOutput ---")
-                    if isinstance(batch_tool_output_or_str.content, str):
-                         batch_response_str = batch_tool_output_or_str.content
-                         # Decide if ToolOutput always means error for batch, or if content needs parsing
-                         # For now, assume content might be valid JSON or error JSON
-                    else:
-                         print(f"--- WARNING: batch_update_tool ToolOutput content is not a string, type: {type(batch_tool_output_or_str.content)}. Treating as potential error info. ---")
-                         # Store the non-string content representation in details
-                         results["error"] = "Batch update tool returned non-string ToolOutput content"
-                         results["details"] = repr(batch_tool_output_or_str.content)
-                         for slide_res in results["slides"]: slide_res["status"] = "batch_failed_non_string_output"
-                         # Return early if this is considered a fatal error
-                         # return results
-                elif isinstance(batch_tool_output_or_str, str):
-                    print("--- DEBUG: batch_update_tool returned str ---")
-                    batch_response_str = batch_tool_output_or_str
-                else:
-                    # Handle unexpected return type
-                    results["error"] = f"Unexpected return type from batch_update tool: {type(batch_tool_output_or_str)}"
-                    results["details"] = repr(batch_tool_output_or_str) # Store raw output representation
-                    for slide_res in results["slides"]: slide_res["status"] = "batch_type_error"
-                    return results # Return results dict with error added
-
-                # Try parsing the batch response string if we got one
-                if batch_response_str:
-                    print(f"--- DEBUG: Attempting json.loads on batch response string (first 200 chars): '{batch_response_str[:200].replace(r'%5Cn', r'\\n') }...' ---") # Added replace for better readability if encoded newlines exist
-                    try:
-                        batch_response = json.loads(batch_response_str)
-                        print("--- DEBUG: Batch update response JSON parsed successfully. ---")
-                        # Optional: Check batch_response content for API-level errors from Google Slides if needed
-                        # e.g., check if batch_response['replies'] contains errors
-
-                        # Update status in results on successful parsing (might refine based on actual API errors)
-                        if "error" not in results: # Don't overwrite previous errors unless success confirmed
-                           for i in range(len(results["slides"])):
-                               results["slides"][i]["status"] = "created" # Or check replies status
-                    except json.JSONDecodeError as batch_json_e:
-                        print(f"--- WARNING: JSONDecodeError parsing batch_update tool response: {batch_json_e}. Presentation might be partially created. ---")
-                        # Error parsing the string response from batch update
-                        results["warning"] = "Invalid JSON response from batch_update_presentation tool (slides might be created/partially created)" # Changed to warning
-                        results["details"] = batch_response_str # Store the raw string
-                        for slide_res in results["slides"]: slide_res["status"] = "batch_json_error"
-                        # Don't return immediately, let the function return the results dict containing warning info
-                # else: If batch_response_str is None (e.g., due to non-string ToolOutput handled above), error is already set.
-
-            except Exception as batch_e:
-                # Catch other potential errors during batch update tool call/processing
-                print(f"--- ERROR: Exception during batch_update call or processing: {batch_e} ---")
-                traceback.print_exc()
-                results["error"] = f"Error during batch_update call or processing: {batch_e}"
-                results["raw_batch_output"] = repr(raw_batch_output) if raw_batch_output else "N/A"
-                for slide_res in results["slides"]: slide_res["status"] = "batch_exception"
-                # Don't return immediately
-
-        # --- 5. Return Results ---
-        # Return the results dictionary, which includes presentation_id
-        # and slide statuses, potentially with error/warning/details fields.
-        print("--- DEBUG: Returning results from create_google_slides ---")
-        return results
-    
     def create_presentation(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
-        """Create a complete presentation from code and documentation."""
-        # Analyze the content
-        analysis = self._analyze_content(code_content, documentation_content)
-        
-        # Create presentation outline
-        outline = self._create_presentation_outline(analysis)
-        
-        results = {
-            "analysis": analysis,
-            "outline": outline,
-            "slides": None
-        }
-        
-        # Create Google Slides if available
-        if self.slides_tool:
-            slides_result = self.create_google_slides(outline)
-            results["slides"] = slides_result
-        
-        # Add token usage statistics
-        results["tokens_used"] = {
-            "prompt_tokens": self.token_counter.prompt_llm_token_count,
-            "completion_tokens": self.token_counter.completion_llm_token_count,
-            "total_tokens": self.token_counter.total_llm_token_count
-        }
-        
-        return results
+        """Analyzes content and then queries the agent to create a presentation based on the analysis."""
+        self.token_counter.reset_counts()
+        analysis_tokens = {}
+        agent_tokens = {}
 
+        try:
+            # Step 1: Analyze content directly (outside the agent loop)
+            analysis_result = self._analyze_content(code_content, documentation_content)
+            
+            # Validate and ensure required fields exist in the analysis
+            required_fields = [
+                "project_title", "one_line_summary", "main_functionality_and_features",
+                "technical_approach_and_implementation_details", "challenges_and_solutions",
+                "key_insights_and_learnings", "potential_extensions_or_improvements"
+            ]
+            
+            for field in required_fields:
+                if field not in analysis_result or not analysis_result[field]:
+                    print(f"Warning: Missing or empty field '{field}' in analysis. Adding default value.")
+                    
+                    # Add default values based on field type
+                    if field == "project_title":
+                        analysis_result[field] = "Project Presentation"
+                    elif field == "one_line_summary":
+                        analysis_result[field] = "Overview of the coding project"
+                    elif field.endswith("_and_solutions"):
+                        # Use a simple list of strings instead of complex objects to avoid string formatting issues
+                        analysis_result[field] = ["Implementation challenge", "Engineering solution"]
+                    else:
+                        analysis_result[field] = ["Default item 1", "Default item 2"]
+            
+            # Special handling for all fields that could contain complex structures
+            for field in analysis_result:
+                value = analysis_result[field]
+                if isinstance(value, list):
+                    string_list = []
+                    for item in value:
+                        if isinstance(item, dict):
+                            # For dictionaries like in challenges_and_solutions
+                            for k, v in item.items():
+                                string_list.append(f"{k.capitalize()}: {v}")
+                        elif isinstance(item, (list, tuple)):
+                            string_list.append(", ".join(str(x) for x in item))
+                        else:
+                            string_list.append(str(item))
+                    analysis_result[field] = string_list
+            
+            for key in analysis_result.keys():
+                value = analysis_result[key]
+                if isinstance(value, list):
+                    print(f"  - {key}: {len(value)} items")
+                else:
+                    print(f"  - {key}: {type(value).__name__}")
+            
+            analysis_tokens = {
+                "prompt": self.token_counter.prompt_llm_token_count,
+                "completion": self.token_counter.completion_llm_token_count,
+                "total": self.token_counter.total_llm_token_count
+            }
+            print(f"Analysis complete. Tokens used: {analysis_tokens['total']}")
+            self.token_counter.reset_counts()
 
-def handle_task(task_description: str) -> str:
-    """
-    Main entry point for the Presentation Agent.
-    Args:
-        task_description: Description of the presentation task, should include
-                          references to code and documentation results
-    Returns:
-        Generated presentation information as a JSON string
-    """
-    agent = None # Initialize agent to None
-    result = None # Initialize result to None
+            analysis_json_str = json.dumps(analysis_result, indent=2)
+            query = f"""
+            Please create a Google Slides presentation based on the following analysis results:
 
-    try:
-        print("--- DEBUG: Initializing PresentationAgent ---")
-        agent = PresentationAgent()
-        print("--- DEBUG: PresentationAgent Initialized ---")
+            Analysis Results:
+            ```json
+            {analysis_json_str}
+            ```
 
-        # Extract code and documentation
-        code_match = re.search(r'CODE:\s*```(?:python)?\s*([\s\S]*?)\s*```', task_description)
-        doc_match = re.search(r'DOCUMENTATION:\s*```(?:markdown)?\s*([\s\S]*?)\s*```', task_description)
-        code_content = code_match.group(1) if code_match else "# No code provided"
-        documentation_content = doc_match.group(1) if doc_match else "No documentation provided"
+            Follow these steps using the available tools:
+            1. Create a presentation outline using the 'create_presentation_outline' tool with the provided analysis results.
+            2. Create a new Google Slides presentation using the 'create_presentation' tool with the title from the outline.
+            3. Add all the slides from the outline to the newly created presentation using the 'batch_update_presentation' tool. Make sure to include titles, content, and speaker notes for each slide as specified in the outline.
 
-        print("--- DEBUG: Extracted code and documentation ---")
-        print(f"--- DEBUG: Code provided: {bool(code_content and code_content != '# No code provided')}")
-        print(f"--- DEBUG: Docs provided: {bool(documentation_content and documentation_content != 'No documentation provided')}")
+            Execute these steps sequentially and provide the final presentation ID or link upon completion.
+            """
 
-        # Generate presentation
-        print("--- DEBUG: Calling agent.create_presentation ---")
-        result = agent.create_presentation(code_content, documentation_content)
-        print("--- DEBUG: agent.create_presentation call completed ---")
+            print("\nStep 2: Querying agent to create presentation from analysis...")
+            # Execute the single query, letting the agent handle the steps
+            agent_response = self._execute_llm_query(query)
+            agent_tokens = {
+                "prompt": self.token_counter.prompt_llm_token_count,
+                "completion": self.token_counter.completion_llm_token_count,
+                "total": self.token_counter.total_llm_token_count
+            }
+            print(f"Agent finished processing. Tokens used: {agent_tokens['total']}")
+            presentation_id = self._extract_presentation_id(agent_response.response)
 
-        # *** Inspect the result before trying to dump it ***
-        print(f"--- DEBUG: Type of result: {type(result)}")
-        print("--- DEBUG: Content of result before json.dumps:")
-        # Use pprint for better dictionary visualization
-        pprint.pprint(result)
+            # Combine token counts
+            total_tokens = {
+                "prompt_tokens": analysis_tokens.get("prompt", 0) + agent_tokens.get("prompt", 0),
+                "completion_tokens": analysis_tokens.get("completion", 0) + agent_tokens.get("completion", 0),
+                "total_tokens": analysis_tokens.get("total", 0) + agent_tokens.get("total", 0)
+            }
 
-        # Format the result as JSON
-        print("--- DEBUG: Attempting json.dumps ---")
-        json_result = json.dumps(result, indent=2)
-        print("--- DEBUG: json.dumps successful ---") # Only prints if it works
-        return json_result
+            # Return the result
+            return {
+                "agent_response": agent_response.response,
+                "presentation_id": presentation_id,
+                "tokens_used": total_tokens
+            }
 
-    except Exception as e:
-        # *** Enhanced Error Logging ***
-        print(f"\n--- ERROR caught in handle_task ---")
-        print(f"--- ERROR Type: {type(e)}")
-        print(f"--- ERROR Details: {e}")
-        print("--- ERROR Traceback: ---")
-        traceback.print_exc() # Print the full traceback to see where the error originated
+        except Exception as e:
+            print(f"Error during presentation creation: {e}")
+            # Combine token counts even in case of error
+            total_tokens = {
+                 "prompt_tokens": analysis_tokens.get("prompt", 0) + agent_tokens.get("prompt", 0),
+                 "completion_tokens": analysis_tokens.get("completion", 0) + agent_tokens.get("completion", 0),
+                 "total_tokens": analysis_tokens.get("total", 0) + agent_tokens.get("total", 0)
+            }
+            return {
+                "error": str(e),
+                "tokens_used": total_tokens
+            }
 
-        # Try to represent the problematic result object safely if it exists
-        safe_result_repr = "Result object not available or not yet assigned"
-        if 'result' in locals() and result is not None:
-             print("--- ERROR: Inspecting result object at time of error ---")
-             pprint.pprint(result) # Try printing the structure again
-             try:
-                 # Try a safer representation in case pprint fails
-                 safe_result_repr = repr(result)
-             except Exception as repr_e:
-                 safe_result_repr = f"Could not represent result object: {repr_e}"
+    def _extract_presentation_id(self, response_text: str) -> str:
+        """Extract presentation ID from the agent's response, prioritizing JSON parsing of tool output."""
+        # Regex explanation:
+        # - (?:Tool Response:|Function Output:|```json) - Non-capturing group for potential markers
+        # - \s* - Optional whitespace
+        # - (\{[\s\S]*?\}) - Capturing group 1: The JSON object itself (curly braces, content, non-greedy)
+        # - \s* - Optional whitespace
+        # - (?:```)? - Optional closing markdown backticks
+        json_pattern = r'(?:Tool Response:|Function Output:|```json)\s*(\{[\s\S]*?\})\s*(?:```)?'
+        json_matches = re.finditer(json_pattern, response_text) # Find all potential JSON blocks
 
-        # Create a JSON-safe error dictionary
-        error_result = {
-            "error": f"Caught exception: {type(e).__name__} - {e}",
-            "status": "failed",
-            "result_at_error_repr": safe_result_repr # Include safe representation
-        }
-        # Return the error info as JSON
-        return json.dumps(error_result, indent=2)
+        for match in json_matches:
+            json_str = match.group(1)
+            try:
+                cleaned_json_str = json_str.replace('\\"', '"').replace('\\n', '\n')
+                data = json.loads(cleaned_json_str)
+                if isinstance(data, dict) and 'presentationId' in data:
+                    extracted_id = data['presentationId']
+                    # Basic validation for Google Slides ID format
+                    if isinstance(extracted_id, str) and len(extracted_id) > 15 and re.match(r'^[a-zA-Z0-9_-]+$', extracted_id):
+                        print(f"Successfully extracted ID via JSON parsing: {extracted_id}")
+                        return extracted_id
+                    else:
+                        print(f"Parsed JSON, found 'presentationId', but value '{extracted_id}' seems invalid.")
+                else:
+                     print("Parsed JSON, but 'presentationId' key not found or data is not a dict.")
+            except json.JSONDecodeError as e:
+                print(f"Failed to parse potential JSON block: {e}")
 
-# Create the Presentation Agent with LlamaIndex
-presentation_agent = FunctionAgent(
-    name="PresentationAgent",
-    description="Generates Google Slides for a code repository",
-    system_prompt="""You are an expert Python programmer that generates and tests code for assignments.
-    
-    Your primary tools:
-    - AnalyzeRequirements: Extract coding requirements from assignment descriptions
-    - GenerateCode: Create Python code that meets the requirements
-    - TestCode: Run and test the code in a secure Docker sandbox
-    
-    When generating code:
-    1. Always start by analyzing and breaking down the requirements
-    2. Generate well-structured, documented Python code
-    3. Include proper error handling and type hints
-    4. Add appropriate unit tests
-    5. Test the code in the Docker sandbox
-    
-    Based on the results, you should:
-    1. If tests pass, provide the code and test results
-    2. If tests fail, analyze the errors and revise the code
-    3. Ask for clarification if requirements are unclear
-    
-    Always ensure code is secure and follows best practices.""",
-    tools=[
-        FunctionTool.from_defaults(fn=handle_task, name="HandlePresentationTask")
-    ],
-    llm=llm,
-    verbose=True
-)
+        print("JSON parsing failed or ID not found in JSON. Falling back to regex patterns...")
+        patterns = [
+            # Look specifically for the ID within a JSON-like structure in the text
+            r'"presentationId"\s*:\s*"([a-zA-Z0-9_-]{20,})"',
+            # Look for common phrases indicating the ID
+            r'[Pp]resentation\s*ID\s*(?:is|:)\s*([a-zA-Z0-9_-]{20,})',
+            r'created\s*(?:a|the)?\s*presentation\s*(?:with\s*ID)?\s*[:=]?\s*([a-zA-Z0-9_-]{20,})',
+            # Look for a Google Slides URL
+            r'https://docs.google.com/presentation/d/([a-zA-Z0-9_-]+)',
+            # General fallback for a long alphanumeric string (use word boundaries)
+            r'\b([a-zA-Z0-9_-]{20,})\b'
+        ]
 
+        for pattern in patterns:
+            flags = re.IGNORECASE if '[Pp]resentation' in pattern else 0
+            match = re.search(pattern, response_text, flags=flags)
+            if match:
+                extracted_id = match.group(1)
+                if len(extracted_id) > 15 and re.match(r'^[a-zA-Z0-9_-]+$', extracted_id):
+                    print(f"Successfully extracted ID via fallback regex pattern '{pattern}': {extracted_id}")
+                    return extracted_id
+                else:
+                    print(f"Regex pattern '{pattern}' matched '{extracted_id}', but it doesn't look like a valid ID. Skipping.")
+
+        print("ERROR: Could not extract presentation ID using any method.")
+        # Return a clearly identifiable error string instead of a potentially valid-looking fake ID
+        return "ERROR_ID_NOT_EXTRACTED"
 
 if __name__ == "__main__":
-    # For testing the agent directly
-    test_task = """
-    Create a presentation for a project that implements a chat assistant.
-    
-    CODE:
-    ```python
+    code = """
     # Chat Assistant Implementation
     import os
     import requests
@@ -680,7 +555,7 @@ if __name__ == "__main__":
             response = requests.post(
                 "https://api.openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY')}",
+                    "Authorization": "Bearer {os.environ.get('OPENROUTER_API_KEY')}",
                     "Content-Type": "application/json"
                 },
                 json={
@@ -698,10 +573,9 @@ if __name__ == "__main__":
     if __name__ == "__main__":
         import uvicorn
         uvicorn.run(app, host="0.0.0.0", port=8000)
-    ```
+    """
     
-    DOCUMENTATION:
-    ```markdown
+    documentation = """
     # Chat Assistant API
     
     A FastAPI server that provides a simple interface to various large language models through the OpenRouter API.
@@ -720,23 +594,23 @@ if __name__ == "__main__":
     Send a chat request with conversation history.
     
     ```json
-    {
+    {{
       "messages": [
-        {"role": "user", "content": "Hello, how are you?"},
-        {"role": "assistant", "content": "I'm doing well! How can I help you today?"},
-        {"role": "user", "content": "Tell me about the solar system."}
+        {{"role": "user", "content": "Hello, how are you?"}},
+        {{"role": "assistant", "content": "I'm doing well! How can I help you today?"}},
+        {{"role": "user", "content": "Tell me about the solar system."}}
       ],
       "model": "anthropic/claude-3-opus",
       "temperature": 0.7
-    }
+    }}
     ```
     
     ### Response
     
     ```json
-    {
+    {{
       "response": "The solar system consists of the Sun and everything that orbits around it..."
-    }
+    }}
     ```
     
     ## Implementation Details
@@ -747,7 +621,7 @@ if __name__ == "__main__":
     ## Deployment
     
     The service can be deployed on Render.com for free. Environment variables must be set for the OpenRouter API key.
-    ```
     """
     
-    print(handle_task(test_task))
+    agent = PresentationAgent()
+    agent.create_presentation(code, documentation)
