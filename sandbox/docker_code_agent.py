@@ -6,6 +6,7 @@ Responsible for generating and testing Python code in a Docker sandbox
 import json
 import os
 import logging
+import socket
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
@@ -34,6 +35,18 @@ def setup_logging(logger_name: str = "code_agent") -> logging.Logger:
     
     return logger
 
+def log_container_info():
+    """Log information about the Docker container environment."""
+    logger = setup_logging("container_info")
+    logger.info("🐳 Docker Container Initialized")
+    logger.info("================================")
+    logger.info(f"🖥️  Hostname: {socket.gethostname()}")
+    logger.info(f"👤 Running as user: {os.getuid()}")
+    logger.info(f"📁 Working directory: {os.getcwd()}")
+    logger.info(f"📚 Sandbox directory mounted: {SANDBOX_DIR.exists()}")
+    logger.info(f"💾 Workspace directory: {WORKSPACE_DIR}")
+    logger.info("================================")
+
 # Initialize LLM and MCP Client
 llm = OpenAI(model="gpt-4.1-nano-2025-04-14", api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -48,13 +61,10 @@ github_mcp_client = BasicMCPClient(
 )
 github_mcp_tool = McpToolSpec(client=github_mcp_client)
 
-# Define paths
-SANDBOX_DIR = Path("sandbox")
-PROJECT_DIR = SANDBOX_DIR / "project"
+# Define paths - sandbox is mounted read-only
+SANDBOX_DIR = Path("sandbox")  # Mounted read-only from host
+WORKSPACE_DIR = Path("workspace")  # Container's writable directory
 INSTRUCTIONS_FILE = SANDBOX_DIR / "instructions"
-
-# Ensure project directory exists
-PROJECT_DIR.mkdir(exist_ok=True)
 
 def normalize_requirements(requirements: Dict[str, Any]) -> Dict[str, Any]:
     """Normalize requirements dictionary to ensure consistent keys."""
@@ -108,7 +118,7 @@ async def analyze_requirements(task_description: str) -> Dict:
         raise
 
 async def generate_code(requirements: Dict) -> Dict[str, str]:
-    """Tool to generate code files based on requirements."""
+    """Tool to generate code files and store them in memory."""
     logger = setup_logging("generate_code")
     logger.info("Generating code files")
     generated_files = {}
@@ -136,9 +146,9 @@ async def generate_code(requirements: Dict) -> Dict[str, str]:
                 )
                 content = response.text
             
-            file_path = PROJECT_DIR / file_name
-            file_path.write_text(content)
+            # Store generated content in memory
             generated_files[file_name] = content
+            logger.info(f"Generated {file_name}")
             
         logger.info("Code generation completed")
         return generated_files
@@ -256,6 +266,9 @@ async def handle_task(ctx: Context) -> str:
     logger.info("Starting code agent task")
     
     try:
+        # Log container initialization info
+        log_container_info()
+        
         # Get instructions first
         instructions = await read_instructions()
         logger.info("Read instructions successfully")
@@ -264,7 +277,7 @@ async def handle_task(ctx: Context) -> str:
         requirements = await analyze_requirements(instructions)
         logger.info("Analyzed requirements")
         
-        # Generate code files
+        # Generate code files (stored in memory)
         generated_files = await generate_code(requirements)
         logger.info(f"Generated files: {list(generated_files.keys())}")
         
@@ -272,7 +285,7 @@ async def handle_task(ctx: Context) -> str:
         repo_info = await create_github_repo(requirements)
         logger.info(f"Created repository: {repo_info['url']}")
         
-        # Push files to Github
+        # Push files directly to Github
         await push_to_github(repo_info, generated_files)
         logger.info("Pushed files to Github")
         
