@@ -1,0 +1,44 @@
+{
+  "main_objective": "Create an engaging, themed chat assistant that leverages multiple LLMs for dynamic conversations, incorporating multimodal inputs and comparative responses to enhance user experience and showcase AI versatility.",
+  "creative_idea": {
+    "summary": "Develop a 'Travel Advisor' themed chat assistant that not only chats with users but also allows uploading travel photos and documents. The assistant can compare responses from different LLMs side-by-side, providing personalized travel tips, destination info, and visual insights, making the experience interactive and visually rich.",
+    "why_interesting": "This approach combines text and image multimodal capabilities, offers a unique comparative view of LLM responses, and tailors the experience to a specific, engaging theme. It demonstrates advanced features like file uploads, multimodal processing, and multi-model comparison within a cohesive, user-friendly interface\u2014making it both educational and captivating."
+  },
+  "required_tasks": [
+    {
+      "type": "code",
+      "description": "Develop a front-end interface using Aider or Roo Code that displays a chat window, allows file uploads (images and text), and provides buttons for selecting LLMs and initiating comparisons. Implement a conversation history view similar to ChatGPT.",
+      "priority": 1
+    },
+    {
+      "type": "code",
+      "description": "Create a FastAPI backend that handles user prompts, file uploads, and communicates with LiteLLM or OpenRouter APIs. Implement endpoints for sending prompts, uploading files, and fetching responses from multiple LLMs for comparison.",
+      "priority": 1
+    },
+    {
+      "type": "code",
+      "description": "Integrate multimodal processing: when images are uploaded, send them to multimodal LLMs (like OpenRouter's multimodal models) and include their responses or insights in the chat.",
+      "priority": 2
+    },
+    {
+      "type": "code",
+      "description": "Implement a feature to compare responses from two different LLMs side-by-side, triggered by a user action, displaying both outputs simultaneously for easy comparison.",
+      "priority": 2
+    },
+    {
+      "type": "code",
+      "description": "Configure deployment on Render.com, ensuring the site is accessible publicly, with clear instructions and API key management for OpenRouter or other LLM providers.",
+      "priority": 3
+    },
+    {
+      "type": "documentation",
+      "description": "Document setup instructions, API key management, and how to upload files and select models. Include a brief overview of the system architecture and features.",
+      "priority": 3
+    },
+    {
+      "type": "presentation",
+      "description": "Prepare a 5-minute demo highlighting the themed chat experience, multimodal uploads, and model comparison features, emphasizing the creative aspects and technical implementation.",
+      "priority": 4
+    }
+  ]
+}
