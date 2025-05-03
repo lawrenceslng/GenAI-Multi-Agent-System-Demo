@@ -1,9 +1,13 @@
 import os
 import json
 import re
+import nest_asyncio
 from typing import Dict, Any, List, Optional
 
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+# Apply nest_asyncio to allow nested event loops
+nest_asyncio.apply()
 
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import FunctionTool
@@ -19,7 +23,17 @@ class PresentationAgent:
     """Agent responsible for creating presentations from coding assignments using tool-calling."""
     
     def __init__(self, model_name: str = "gpt-4o"):
-        """Initialize the presentation agent with specified LLM and tools."""
+        """Initialize basic attributes of the presentation agent."""
+        self.model_name = model_name
+        self.token_counter = None
+        self.api_key = None
+        self.llm = None
+        self.slides_tool = None
+        self.tools = None
+        self.agent = None
+
+    async def initialize(self):
+        """Async initialization of the presentation agent."""
         # Set up token counting
         self.token_counter = TokenCountingHandler(tokenizer=None)
         callback_manager = CallbackManager([self.token_counter])
@@ -29,13 +43,15 @@ class PresentationAgent:
             raise ValueError("OPENAI_API_KEY not found in environment")
             
         self.llm = OpenAI(
-            model=model_name,
+            model=self.model_name,
             api_key=self.api_key,
             callback_manager=callback_manager
         )
         
         self.slides_tool = self._init_slides_tool()
-        self.tools = self._create_tools()
+        self.tools = []
+        tools = await self._create_tools()
+        self.tools.extend(tools)
         
         self.agent = ReActAgent.from_tools(
             tools=self.tools,
@@ -43,6 +59,7 @@ class PresentationAgent:
             verbose=True,
             system_prompt=self._get_system_prompt()
         )
+        return self
     
     def _init_slides_tool(self) -> Optional[McpToolSpec]:
         """Initialize Google Slides MCP tool."""
@@ -67,7 +84,7 @@ class PresentationAgent:
             print(f"Error initializing Google Slides MCP tool: {e}")
             return None
     
-    def _create_tools(self) -> List[FunctionTool]:
+    async def _create_tools(self) -> List[FunctionTool]:
         """Create a set of tools for the presentation agent to use."""
         tools = []
 
@@ -79,11 +96,12 @@ class PresentationAgent:
         tools.append(create_outline_tool)
 
         if self.slides_tool:
-            tools.extend(self.slides_tool.to_tool_list())
+            slide_tools = await self.slides_tool.to_tool_list_async()
+            tools.extend(slide_tools)
 
         return tools
     
-    def _analyze_content(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
+    async def _analyze_content(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
         """Analyze code and documentation in chunks to extract key points for presentation."""
         # Process code in chunks if needed
         code_chunks = self._chunk_text(code_content, max_chunk_size=1500)
@@ -104,7 +122,7 @@ class PresentationAgent:
             """
             
             messages = [ChatMessage(role=MessageRole.USER, content=prompt)]
-            response = self.llm.chat(messages)
+            response = await self.llm.achat(messages)
             code_analyses.append(response.message.content)
         
         doc_analyses = []
@@ -121,7 +139,7 @@ class PresentationAgent:
             """
             
             messages = [ChatMessage(role=MessageRole.USER, content=prompt)]
-            response = self.llm.chat(messages)
+            response = await self.llm.achat(messages)
             doc_analyses.append(response.message.content)
         
         synthesis_prompt = f"""
@@ -170,7 +188,7 @@ class PresentationAgent:
         """
         
         messages = [ChatMessage(role=MessageRole.USER, content=synthesis_prompt)]
-        response = self.llm.chat(messages)
+        response = await self.llm.achat(messages)
         
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response.message.content)
         if json_match:
@@ -342,12 +360,12 @@ class PresentationAgent:
         wait=wait_exponential(multiplier=1, min=2, max=60),
         stop=stop_after_attempt(5)
     )
-    def _execute_llm_query(self, query: str):
+    async def _execute_llm_query(self, query: str):
         """Execute LLM query with retry logic for rate limit errors."""
         # Note: The agent handles its own token counting via the callback manager
-        return self.agent.chat(query) # Use chat for conversational interaction
+        return await self.agent.achat(query) # Use achat for async chat interaction
 
-    def create_presentation(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
+    async def create_presentation(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
         """Analyzes content and then queries the agent to create a presentation based on the analysis."""
         self.token_counter.reset_counts()
         analysis_tokens = {}
@@ -355,7 +373,7 @@ class PresentationAgent:
 
         try:
             # Step 1: Analyze content directly (outside the agent loop)
-            analysis_result = self._analyze_content(code_content, documentation_content)
+            analysis_result = await self._analyze_content(code_content, documentation_content)
             
             # Validate and ensure required fields exist in the analysis
             required_fields = [
@@ -429,7 +447,7 @@ class PresentationAgent:
 
             print("\nStep 2: Querying agent to create presentation from analysis...")
             # Execute the single query, letting the agent handle the steps
-            agent_response = self._execute_llm_query(query)
+            agent_response = await self._execute_llm_query(query)
             agent_tokens = {
                 "prompt": self.token_counter.prompt_llm_token_count,
                 "completion": self.token_counter.completion_llm_token_count,
@@ -521,6 +539,28 @@ class PresentationAgent:
         print("ERROR: Could not extract presentation ID using any method.")
         # Return a clearly identifiable error string instead of a potentially valid-looking fake ID
         return "ERROR_ID_NOT_EXTRACTED"
+
+# # Create initial presentation agent instance
+# presentation_agent = None
+
+# async def get_presentation_agent():
+#     """Get or create the presentation agent instance."""
+#     global presentation_agent
+#     if presentation_agent is None:
+#         presentation_agent = await PresentationAgent().__ainit__()
+#     return presentation_agent
+
+# Global instance
+presentation_agent = None
+
+async def get_presentation_agent():
+    """Get or create the presentation agent instance."""
+    global presentation_agent
+    if presentation_agent is None:
+        agent = PresentationAgent()
+        await agent.initialize()
+        presentation_agent = agent
+    return presentation_agent
 
 if __name__ == "__main__":
     code = """
@@ -623,5 +663,10 @@ if __name__ == "__main__":
     The service can be deployed on Render.com for free. Environment variables must be set for the OpenRouter API key.
     """
     
-    agent = PresentationAgent()
-    agent.create_presentation(code, documentation)
+    async def main():
+        agent = PresentationAgent()
+        await agent.initialize()
+        return await agent.create_presentation(code, documentation)
+    
+    import asyncio
+    asyncio.run(main())
