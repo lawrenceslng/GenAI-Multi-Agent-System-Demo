@@ -34,32 +34,52 @@ class PresentationAgent:
 
     async def initialize(self):
         """Async initialization of the presentation agent."""
-        # Set up token counting
-        self.token_counter = TokenCountingHandler(tokenizer=None)
-        callback_manager = CallbackManager([self.token_counter])
-        
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment")
+        try:
+            # Set up token counting
+            self.token_counter = TokenCountingHandler(tokenizer=None)
+            callback_manager = CallbackManager([self.token_counter])
             
-        self.llm = OpenAI(
-            model=self.model_name,
-            api_key=self.api_key,
-            callback_manager=callback_manager
-        )
-        
-        self.slides_tool = self._init_slides_tool()
-        self.tools = []
-        tools = await self._create_tools()
-        self.tools.extend(tools)
-        
-        self.agent = ReActAgent.from_tools(
-            tools=self.tools,
-            llm=self.llm,
-            verbose=True,
-            system_prompt=self._get_system_prompt()
-        )
-        return self
+            # Initialize OpenAI
+            self.api_key = os.getenv("OPENAI_API_KEY")
+            if not self.api_key:
+                raise ValueError("OPENAI_API_KEY not found in environment")
+                
+            self.llm = OpenAI(
+                model=self.model_name,
+                api_key=self.api_key,
+                callback_manager=callback_manager
+            )
+            
+            # Initialize MCP tools
+            self.slides_tool = self._init_slides_tool()
+            if not self.slides_tool:
+                print("Warning: Google Slides MCP tool initialization failed")
+            
+            self.github_tool = self._init_github_tool()
+            if not self.github_tool:
+                print("Warning: Github MCP tool initialization failed")
+            
+            # Create tools list
+            self.tools = []
+            tools = await self._create_tools()
+            self.tools.extend(tools)
+            
+            # Initialize agent
+            self.agent = ReActAgent.from_tools(
+                tools=self.tools,
+                llm=self.llm,
+                verbose=True,
+                system_prompt=self._get_system_prompt()
+            )
+            
+            # Create a tools dictionary for context
+            self.tools_dict = {tool.name: tool for tool in self.tools}
+            
+            return self
+            
+        except Exception as e:
+            print(f"Error during initialization: {e}")
+            raise
     
     def _init_slides_tool(self) -> Optional[McpToolSpec]:
         """Initialize Google Slides MCP tool."""
@@ -84,21 +104,103 @@ class PresentationAgent:
             print(f"Error initializing Google Slides MCP tool: {e}")
             return None
     
+    def _init_github_tool(self) -> Optional[McpToolSpec]:
+        """Initialize Github MCP tool."""
+        try:
+            # server_path = os.path.join(
+            #     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            #     "github-mcp-server/github-mcp-server"
+            # )
+            
+            # github_token = os.getenv("GITHUB_TOKEN")
+            # if not github_token:
+            #     print("Warning: GITHUB_TOKEN not found in environment")
+            #     return None
+                
+            # github_mcp_client = BasicMCPClient(
+            #     command_or_url=server_path,
+            #     args=[server_path, "--github-token", github_token]
+            # )
+            # return McpToolSpec(client=github_mcp_client)
+            github_mcp_client = BasicMCPClient(
+                command_or_url=os.getenv("GITHUB_MCP_URL"),
+                args=["stdio"],
+                env={
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": os.getenv("GITHUB_PAT")
+                }
+            )
+            return McpToolSpec(client=github_mcp_client)
+        except Exception as e:
+            print(f"Error initializing Github MCP tool: {e}")
+            return None
+
     async def _create_tools(self) -> List[FunctionTool]:
         """Create a set of tools for the presentation agent to use."""
+        print("\n=== Initializing Presentation Tools ===")
         tools = []
+        self.tools_dict = {}  # Initialize tools dictionary
 
+        print("\nStep 1: Creating outline tool...")
+        # Create outline tool with explicit name attribute
         create_outline_tool = FunctionTool.from_defaults(
+            fn=self._create_presentation_outline,
             name="create_presentation_outline",
-            description="Creates a structured outline for a presentation based on pre-analyzed content.",
-            fn=self._create_presentation_outline
+            description="Creates a structured outline for a presentation based on pre-analyzed content."
         )
+        create_outline_tool.name = "create_presentation_outline"  # Explicitly set name
         tools.append(create_outline_tool)
+        print(f"✓ Created outline tool: {create_outline_tool.name}")
+        print("✓ Outline tool created")
 
+        print("\nStep 2: Loading Google Slides tools...")
         if self.slides_tool:
-            slide_tools = await self.slides_tool.to_tool_list_async()
-            tools.extend(slide_tools)
+            try:
+                slide_tools = await self.slides_tool.to_tool_list_async()
+                tools.extend(slide_tools)
+                # Add to tools dictionary
+                for tool in slide_tools:
+                    self.tools_dict[tool.name] = tool
+                print("✓ Google Slides tools loaded:")
+                # for tool in slide_tools:
+                #     print(f"  - {tool.name}")
+            except Exception as e:
+                print(f"ERROR: Failed to load Google Slides tools: {e}")
+        else:
+            print("WARNING: Google Slides tool not initialized")
 
+        print("\nStep 3: Loading Github tools...")
+        if self.github_tool:
+            try:
+                github_tools = await self.github_tool.to_tool_list_async()
+                tools.extend(github_tools)
+                # Add to tools dictionary
+                for tool in github_tools:
+                    self.tools_dict[tool.name] = tool
+                print("✓ Github tools loaded:")
+                # for tool in github_tools:
+                #     print(f"  - {tool.name}")
+            except Exception as e:
+                print(f"ERROR: Failed to load Github tools: {e}")
+        else:
+            print("WARNING: Github tool not initialized")
+
+        print("\nTool initialization summary:")
+        print(f"Total tools available: {len(tools)}")
+        print("Available tools:")
+        # for tool in tools:
+        #     print(f"- {tool.name}: {tool.description}")
+
+        print("=== Tool Initialization Complete ===\n")
+        # Create tools dictionary
+        self.tools_dict = {}
+        for tool in tools:
+            if not hasattr(tool, 'name'):
+                tool.name = f"tool_{len(self.tools_dict)}"
+            self.tools_dict[tool.name] = tool
+            print(f"Added to tools dictionary: {tool.name}")
+
+        print(f"\nTotal tools initialized: {len(tools)}")
+        print("Available tools:", ", ".join(self.tools_dict.keys()))
         return tools
     
     async def _analyze_content(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
@@ -317,43 +419,90 @@ class PresentationAgent:
         
         return outline
     
+    def _get_steps(self) -> List[Dict[str, str]]:
+        """Define the steps for creating a presentation."""
+        print("\nInitializing presentation creation steps...")
+        steps = [
+            {
+                "name": "create_presentation_outline",
+                "description": "Create a structured outline using the analysis results",
+                "tool": "create_presentation_outline",
+                "input_key": "analysis",
+                "output_key": "outline",
+                "required_tools": ["create_presentation_outline"]
+            },
+            {
+                "name": "create_presentation",
+                "description": "Create a new Google Slides presentation",
+                "tool": "create_presentation",
+                "input_key": "title",
+                "output_key": "presentationId",
+                "required_tools": ["create_presentation"]
+            },
+            {
+                "name": "batch_update_presentation",
+                "description": "Add all slides to the presentation",
+                "tool": "batch_update_presentation",
+                "input_key": "presentationId",
+                "output_key": "result",
+                "required_tools": ["batch_update_presentation", "get_presentation"]
+            }
+        ]
+        
+        print("\nValidating presentation steps...")
+        for i, step in enumerate(steps, 1):
+            print(f"\nStep {i}: {step['name']}")
+            print(f"- Description: {step['description']}")
+            print(f"- Tool: {step['tool']}")
+            print(f"- Required tools: {', '.join(step['required_tools'])}")
+            
+            # Verify required tools are available
+            # missing_tools = [
+            #     tool for tool in step['required_tools']
+            #     if not any(t.name == tool for t in (self.tools or []))
+            # ]
+            # if missing_tools:
+            #     print(f"WARNING: Missing required tools for {step['name']}: {', '.join(missing_tools)}")
+            # else:
+            #     print(f"✓ All required tools available for {step['name']}")
+        
+        print("\n✓ Presentation steps initialized and validated")
+        return steps
+
     def _get_system_prompt(self) -> str:
         """Define the system prompt that guides the agent's reasoning."""
-        return """
+        steps = self._get_steps()
+        steps_text = "\n".join(f"{i+1}. **{step['name']}:** {step['description']}"
+                             for i, step in enumerate(steps))
+        
+        return f"""
         You are an expert presentation creator specialized in generating compelling presentations for coding projects based on pre-analyzed content.
 
-        Your task is to create a professional presentation using the provided analysis results by following these steps SEQUENTIALLY:
+        Follow these steps SEQUENTIALLY to create the presentation:
 
-        1.  **Create Outline:** Use the `create_presentation_outline` tool.
-            *   Input: The analysis results provided in the user query.
-            *   Output: A structured outline containing a list of slides, each with `title`, `content` (as a list of strings), and `speaker_notes`.
+        {steps_text}
 
-        2.  **Create Presentation:** Use the `create_presentation` tool.
-            *   Input: The `title` from the outline generated in Step 1.
-            *   Output: A JSON object containing the `presentationId`. **CRITICAL: You MUST capture this `presentationId` from the tool's response.**
+        For each step:
+        1. Use the specified tool
+        2. Pass the required input parameters
+        3. Capture and validate the output
+        4. Use the output in subsequent steps as needed
 
-        3.  **Populate Slides:** Use the `batch_update_presentation` tool.
-            *   Input:
-                *   `presentationId`: The **exact** `presentationId` obtained from the output of Step 2.
-                *   `requests`: Construct an array of requests to perform the following actions **IN ORDER**:
-                    *   **a) Delete Default Slide:** Add a `deleteObject` request targeting the default first slide. You might need to get the ID of the first slide first using `getPresentation` or assume a common default ID pattern if the tool supports it (check tool description if unsure, otherwise skip deletion if too complex). If skipping deletion, ensure your first `createSlide` uses `insertionIndex: 0`.
-                    *   **b) Create and Populate Slides:** For **EACH** slide in the outline from Step 1:
-                        *   Create a `createSlide` request. Specify a layout (e.g., `TITLE_AND_BODY`). Use `placeholderIdMappings` to assign unique `objectId`s to the `TITLE` and `BODY` placeholders (e.g., `slide_1_title`, `slide_1_body`). Use `insertionIndex` to control slide order.
-                        *   Create an `insertText` request for the slide's `title`, targeting the `objectId` you assigned to the `TITLE` placeholder.
-                        *   Create a **SEPARATE** `insertText` request for the slide's `content`. **THIS STEP IS CRITICAL AND MUST NOT BE SKIPPED**. You must:
-                            *   Join the list of content strings with newlines (`\n`)
-                            *   Target the `objectId` you assigned to the `BODY` placeholder in your placeholderIdMappings
-                            *   Make sure this is a separate request from the title insertText request
-                        *   (Optional but recommended) Create an `updateShapeProperties` request to set the speaker notes, targeting the slide's notes page element (requires knowing its objectId, often related to the slideId). If unsure how, skip speaker notes for now.
-            *   Output: Confirmation that slides were updated.
+        When using batch_update_presentation:
+        1. Delete the default first slide if possible
+        2. Create new slides with proper layouts
+        3. Add titles and content separately
+        4. Include speaker notes where possible
+        5. Maintain proper slide order
 
         **IMPORTANT RULES:**
-        *   Execute steps in order.
-        *   Use the **exact** `presentationId` from Step 2 in Step 3.
-        *   For Step 3b, ensure you generate **BOTH** `insertText` requests (title and body) for **EVERY** slide in the outline. Join body content list with newlines.
-        *   The most common mistake is forgetting to create a separate `insertText` request for the slide content or forgetting to target the correct placeholder ID for the body content.
-        *   When joining content strings with newlines, make sure they are all plain strings (not objects).
-        *   Explain your reasoning, especially how you construct the `requests` array for `batch_update_presentation`.
+        * Execute steps in exact order
+        * Validate all inputs and outputs
+        * Keep track of the presentationId
+        * Create separate requests for titles and content
+        * Join content strings with newlines
+        * Ensure all strings are properly formatted
+        * Explain your reasoning for each step
         """
         
     @retry(
@@ -365,17 +514,90 @@ class PresentationAgent:
         # Note: The agent handles its own token counting via the callback manager
         return await self.agent.achat(query) # Use achat for async chat interaction
 
-    async def create_presentation(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
+    async def create_presentation(self) -> Dict[str, Any]:
+        """Create a presentation by fetching code and documentation from Github."""
+        try:
+            if not self.github_tool:
+                raise ValueError("Github MCP tool not initialized. Please check GITHUB_TOKEN environment variable.")
+
+            # First get list of repositories
+            list_repos_response = await self.agent.achat("""
+            Use the Github MCP list_repositories tool to get a list of repositories.
+            Return ONLY the name of the most recently created repository.
+            """)
+            
+            repo_name = list_repos_response.response.strip()
+            if not repo_name:
+                print("ERROR: Empty repository name received")
+                raise ValueError("Failed to get repository name from Github")
+            
+            print(f"✓ Found latest repository: {repo_name}")
+            
+            print("\nStep 3: Fetching main.py content...")
+            # Now get the contents of main.py
+            get_code_response = await self.agent.achat(f"""
+            Use the Github MCP get_file_content tool to get the contents of main.py from the repository '{repo_name}'.
+            Return ONLY the file content, no additional text.
+            """)
+            
+            code_content = get_code_response.response.strip()
+            if not code_content:
+                print("ERROR: Empty main.py content received")
+                raise ValueError("Failed to get main.py content from Github")
+            
+            print(f"✓ Successfully fetched main.py content ({len(code_content)} chars)")
+            
+            print("\nStep 4: Fetching README.md content...")
+            # Get the contents of README.md
+            get_doc_response = await self.agent.achat(f"""
+            Use the Github MCP get_file_content tool to get the contents of README.md from the repository '{repo_name}'.
+            Return ONLY the file content, no additional text.
+            """)
+            
+            documentation_content = get_doc_response.response.strip()
+            if not documentation_content:
+                print("ERROR: Empty README.md content received")
+                raise ValueError("Failed to get README.md content from Github")
+            
+            print(f"✓ Successfully fetched README.md content ({len(documentation_content)} chars)")
+            
+            print("\nStep 5: Creating presentation with fetched content...")
+            # Call the original create_presentation method with the fetched content
+            result = await self._create_presentation_with_content(code_content, documentation_content)
+            print("✓ Presentation creation completed")
+            print("=== Presentation Creation Process Complete ===\n")
+            return result
+        except Exception as e:
+            print(f"Error creating presentation: {e}")
+            return {
+                "error": str(e),
+                "tokens_used": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0
+                }
+            }
+
+    async def _create_presentation_with_content(self, code_content: str, documentation_content: str) -> Dict[str, Any]:
         """Analyzes content and then queries the agent to create a presentation based on the analysis."""
+        print("\n=== Starting Presentation Content Creation ===")
+        print(f"Input content sizes:")
+        print(f"- Code content: {len(code_content)} chars")
+        print(f"- Documentation content: {len(documentation_content)} chars")
+        
         self.token_counter.reset_counts()
         analysis_tokens = {}
         agent_tokens = {}
 
         try:
             # Step 1: Analyze content directly (outside the agent loop)
+            print("\nStep 1: Starting content analysis...")
             analysis_result = await self._analyze_content(code_content, documentation_content)
+            print("✓ Content analysis completed")
+            print(f"Analysis result contains {len(analysis_result)} fields")
             
-            # Validate and ensure required fields exist in the analysis
+            # Step 2: Validate analysis results
+            print("\nStep 2: Validating analysis results...")
             required_fields = [
                 "project_title", "one_line_summary", "main_functionality_and_features",
                 "technical_approach_and_implementation_details", "challenges_and_solutions",
@@ -383,7 +605,12 @@ class PresentationAgent:
             ]
             
             for field in required_fields:
-                if field not in analysis_result or not analysis_result[field]:
+                print(f"Checking field: {field}")
+                if field not in analysis_result:
+                    print(f"ERROR: Missing required field: {field}")
+                    raise ValueError(f"Analysis result missing required field: {field}")
+                if not analysis_result[field]:
+                    print(f"ERROR: Empty required field: {field}")
                     print(f"Warning: Missing or empty field '{field}' in analysis. Adding default value.")
                     
                     # Add default values based on field type
@@ -428,7 +655,16 @@ class PresentationAgent:
             print(f"Analysis complete. Tokens used: {analysis_tokens['total']}")
             self.token_counter.reset_counts()
 
+            # Get the presentation creation steps
+            print("\nGetting presentation creation steps...")
+            steps = self._get_steps()
+            print(f"✓ Found {len(steps)} steps to execute")
+            
+            # Create the query with detailed step instructions
             analysis_json_str = json.dumps(analysis_result, indent=2)
+            steps_instructions = "\n".join(f"{i+1}. {step['description']} using the '{step['tool']}' tool"
+                                        for i, step in enumerate(steps))
+            
             query = f"""
             Please create a Google Slides presentation based on the following analysis results:
 
@@ -437,26 +673,62 @@ class PresentationAgent:
             {analysis_json_str}
             ```
 
-            Follow these steps using the available tools:
-            1. Create a presentation outline using the 'create_presentation_outline' tool with the provided analysis results.
-            2. Create a new Google Slides presentation using the 'create_presentation' tool with the title from the outline.
-            3. Add all the slides from the outline to the newly created presentation using the 'batch_update_presentation' tool. Make sure to include titles, content, and speaker notes for each slide as specified in the outline.
+            Follow these steps EXACTLY in order:
+            {steps_instructions}
+
+            For each step:
+            1. Use the exact tool specified
+            2. Validate inputs before using the tool
+            3. Verify the tool's output
+            4. Use the output in subsequent steps as needed
+
+            IMPORTANT:
+            - The presentationId from step 2 is CRITICAL for step 3
+            - Each slide must have separate title and content
+            - Content must be properly formatted with newlines
+            - Speaker notes should be included where possible
 
             Execute these steps sequentially and provide the final presentation ID or link upon completion.
             """
 
-            print("\nStep 2: Querying agent to create presentation from analysis...")
-            # Execute the single query, letting the agent handle the steps
+            print("\nStep 3: Creating presentation query...")
+            print("Query length:", len(query))
+            print("Analysis fields being used:", list(analysis_result.keys()))
+            print("Steps to execute:")
+            for i, step in enumerate(steps, 1):
+                print(f"  {i}. {step['name']} using {step['tool']}")
+                print(f"     Input: {step['input_key']}, Output: {step['output_key']}")
+            
+            print("\nStep 4: Executing agent query...")
+            print("Sending query to agent for presentation creation...")
             agent_response = await self._execute_llm_query(query)
+            print("✓ Agent query completed")
+            print("Response length:", len(agent_response.response))
+            
+            # Log the expected tool usage
+            print("\nExpected tool sequence:")
+            for step in steps:
+                print(f"- {step['tool']} should be called with {step['input_key']}")
             agent_tokens = {
                 "prompt": self.token_counter.prompt_llm_token_count,
                 "completion": self.token_counter.completion_llm_token_count,
                 "total": self.token_counter.total_llm_token_count
             }
-            print(f"Agent finished processing. Tokens used: {agent_tokens['total']}")
+            print(f"\nStep 5: Processing agent response...")
+            print(f"Token usage breakdown:")
+            print(f"- Prompt tokens: {agent_tokens['prompt']}")
+            print(f"- Completion tokens: {agent_tokens['completion']}")
+            print(f"- Total tokens: {agent_tokens['total']}")
+            
+            print("\nStep 6: Extracting presentation ID...")
             presentation_id = self._extract_presentation_id(agent_response.response)
+            if presentation_id == "ERROR_ID_NOT_EXTRACTED":
+                print("ERROR: Failed to extract presentation ID from response")
+                print("Raw response excerpt (first 200 chars):", agent_response.response[:200])
+            else:
+                print(f"✓ Successfully extracted presentation ID: {presentation_id}")
 
-            # Combine token counts
+            print("\nStep 7: Calculating total token usage...")
             total_tokens = {
                 "prompt_tokens": analysis_tokens.get("prompt", 0) + agent_tokens.get("prompt", 0),
                 "completion_tokens": analysis_tokens.get("completion", 0) + agent_tokens.get("completion", 0),
@@ -471,20 +743,31 @@ class PresentationAgent:
             }
 
         except Exception as e:
-            print(f"Error during presentation creation: {e}")
-            # Combine token counts even in case of error
+            print("\nERROR during presentation creation:")
+            print(f"- Error type: {type(e).__name__}")
+            print(f"- Error message: {str(e)}")
+            if hasattr(e, '__traceback__'):
+                print(f"- Error location: {e.__traceback__.tb_frame.f_code.co_filename}:{e.__traceback__.tb_lineno}")
+            
+            print("\nCalculating final token usage despite error...")
             total_tokens = {
                  "prompt_tokens": analysis_tokens.get("prompt", 0) + agent_tokens.get("prompt", 0),
                  "completion_tokens": analysis_tokens.get("completion", 0) + agent_tokens.get("completion", 0),
                  "total_tokens": analysis_tokens.get("total", 0) + agent_tokens.get("total", 0)
             }
-            return {
+            error_response = {
                 "error": str(e),
+                "error_type": type(e).__name__,
                 "tokens_used": total_tokens
             }
+            print("\nReturning error response:", json.dumps(error_response, indent=2))
+            return error_response
 
     def _extract_presentation_id(self, response_text: str) -> str:
         """Extract presentation ID from the agent's response, prioritizing JSON parsing of tool output."""
+        print("\nAttempting to extract presentation ID from response...")
+        print(f"Response length: {len(response_text)} chars")
+        print("\nAttempting to extract presentation ID from response...")
         # Regex explanation:
         # - (?:Tool Response:|Function Output:|```json) - Non-capturing group for potential markers
         # - \s* - Optional whitespace
@@ -666,7 +949,7 @@ if __name__ == "__main__":
     async def main():
         agent = PresentationAgent()
         await agent.initialize()
-        return await agent.create_presentation(code, documentation)
+        return await agent._create_presentation_with_content(code, documentation)
     
     import asyncio
     asyncio.run(main())
