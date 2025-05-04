@@ -13,6 +13,8 @@ import json
 import argparse
 import re
 import asyncio
+import signal
+import atexit
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -204,6 +206,8 @@ class OrchestratorAgent:
                 result = await handle_task(context)
             elif task["type"] == TaskType.VOICEOVER.value:
                 # For voiceover agent, use generate_and_save_audio
+                print("\n=== Starting Voiceover Task ===")
+                
                 # First, get the code task result from the context
                 state = await context.get("state", {})
                 completed_tasks = state.get("completed_tasks", [])
@@ -270,8 +274,10 @@ class OrchestratorAgent:
                 The voiceover should be 1 minute long when spoken.
                 """
                 
+                print("\nGenerating script for voiceover...")
                 script_response = await llm.acomplete(script_prompt)
                 script = script_response.text
+                print("✓ Script generated successfully")
                 
                 # Get or create the agent context
                 try:
@@ -284,11 +290,16 @@ class OrchestratorAgent:
                 # Add retry logic for handling rate limits
                 max_retries = 3
                 retry_delay = 5  # seconds
+                result = None
                 
+                print("\nGenerating audio from script...")
                 for attempt in range(max_retries):
                     try:
+                        from agents.voiceover_agent import generate_and_save_audio, close_mcp_client
+                        
                         result = await generate_and_save_audio(script, agent, agent_context)
                         if "error" not in result:
+                            print("✓ Audio generated successfully")
                             break
                         if "quota_exceeded" in str(result.get("error", "")).lower() or "too_many_concurrent_requests" in str(result.get("error", "")).lower():
                             if attempt < max_retries - 1:
@@ -296,6 +307,7 @@ class OrchestratorAgent:
                                 await asyncio.sleep(retry_delay)
                                 retry_delay *= 2  # Exponential backoff
                                 continue
+                        print(f"Error generating audio: {result.get('error', 'Unknown error')}")
                         break
                     except Exception as e:
                         if attempt < max_retries - 1:
@@ -304,7 +316,18 @@ class OrchestratorAgent:
                             await asyncio.sleep(retry_delay)
                             retry_delay *= 2
                         else:
+                            print(f"Failed after {max_retries} attempts: {str(e)}")
                             raise
+                
+                # Ensure MCP client is properly closed
+                try:
+                    print("\nCleaning up MCP client resources...")
+                    await close_mcp_client()
+                    print("✓ MCP client resources cleaned up")
+                except Exception as e:
+                    print(f"Warning: Error while closing MCP client: {str(e)}")
+                
+                print("=== Voiceover Task Complete ===\n")
             elif task["type"] == TaskType.PRESENTATION.value:
                 print("\n=== Starting Presentation Task ===")
                 print("Initializing presentation agent...")
@@ -441,6 +464,7 @@ class OrchestratorAgent:
         print(f"Total tasks to execute: {len(tasks)}")
         results = []
         completed_types = set()
+        active_tasks = []  # Track active tasks
         
         # Initialize completed_tasks in context if it doesn't exist
         state = await context.get("state", {})
@@ -471,6 +495,12 @@ class OrchestratorAgent:
                 task_groups[task_type].sort(key=lambda x: x["priority"])
                 print(f"Tasks sorted by priority (lowest first)")
                 
+                # Wait for any active tasks to complete before starting new task type
+                if active_tasks:
+                    print(f"\nWaiting for {len(active_tasks)} active tasks to complete before starting {task_type} tasks...")
+                    await asyncio.gather(*active_tasks)
+                    active_tasks = []  # Clear the list after all tasks complete
+                
                 if task_type == "code":
                     # For code tasks, combine all descriptions and execute once
                     combined_task = {
@@ -490,11 +520,15 @@ class OrchestratorAgent:
                     print(f"✓ Code tasks completed with status: {result['status']}")
                 else:
                     # For other types, execute each task separately
+                    task_results = []
+                    
                     for i, task in enumerate(task_groups[task_type], 1):
                         print(f"\nExecuting {task_type} task {i}/{len(task_groups[task_type])}...")
                         print(f"Task priority: {task['priority']}")
+                        
+                        # Execute the task
                         result = await self.execute_task(task, context)
-                        results.append(result)
+                        task_results.append(result)
                         
                         # Store the result in the context for later tasks
                         state = await context.get("state", {})
@@ -504,9 +538,29 @@ class OrchestratorAgent:
                         print(f"✓ Task completed with status: {result['status']}")
                         if "error" in result:
                             print(f"ERROR: {result['error']}")
+                    
+                    # Add all results from this task type
+                    results.extend(task_results)
+                
+                # Ensure all resources for this task type are properly cleaned up
+                if task_type == "voiceover":
+                    try:
+                        from agents.voiceover_agent import close_mcp_client
+                        print("\nFinal cleanup of MCP client resources...")
+                        await close_mcp_client()
+                        print("✓ MCP client resources cleaned up")
+                    except Exception as e:
+                        print(f"Warning: Error during final MCP client cleanup: {str(e)}")
                 
                 completed_types.add(task_type)
                 print(f"✓ All {task_type} tasks completed")
+
+        # Final verification that all tasks are complete
+        print("\nVerifying all tasks are complete...")
+        if active_tasks:
+            print(f"Waiting for {len(active_tasks)} remaining tasks to complete...")
+            await asyncio.gather(*active_tasks)
+            print("✓ All remaining tasks completed")
 
         print("\n=== Task Orchestration Complete ===")
         print(f"Completed task types: {', '.join(completed_types)}")
@@ -722,6 +776,45 @@ orchestrator_agent = FunctionAgent(
     verbose=True
 )
 
+# Global cleanup function to ensure MCP resources are properly closed
+async def cleanup_resources():
+    """Ensure all MCP resources are properly closed when the program exits."""
+    print("\n=== Performing Final Resource Cleanup ===")
+    try:
+        # Import here to avoid circular imports
+        from agents.voiceover_agent import close_mcp_client
+        await close_mcp_client()
+        print("✓ MCP client resources cleaned up")
+    except Exception as e:
+        print(f"Warning: Error during final cleanup: {str(e)}")
+    print("=== Resource Cleanup Complete ===\n")
+
+# Synchronous wrapper for cleanup function
+def sync_cleanup():
+    """Synchronous wrapper for cleanup_resources to use with atexit."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(cleanup_resources())
+        else:
+            loop.run_until_complete(cleanup_resources())
+    except Exception as e:
+        print(f"Error during sync cleanup: {str(e)}")
+
+# Register cleanup function to run on exit
+atexit.register(sync_cleanup)
+
+# Signal handler for graceful shutdown
+def signal_handler(sig, frame):
+    """Handle termination signals by cleaning up resources before exit."""
+    print(f"\nReceived signal {sig}, cleaning up resources...")
+    sync_cleanup()
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 def main():
     parser = argparse.ArgumentParser(description="Multi-Agent Homework System")
     parser.add_argument(
@@ -732,10 +825,19 @@ def main():
     
     args = parser.parse_args()
     
-    # Run orchestrator
-    import asyncio
-    orchestrator = OrchestratorAgent()
-    asyncio.run(orchestrator.run(args.assignment))
+    try:
+        # Run orchestrator
+        import asyncio
+        orchestrator = OrchestratorAgent()
+        asyncio.run(orchestrator.run(args.assignment))
+    except KeyboardInterrupt:
+        print("\nProgram interrupted by user, cleaning up...")
+    except Exception as e:
+        print(f"\nUnexpected error: {str(e)}")
+        print("Cleaning up resources...")
+    finally:
+        # Ensure cleanup runs even if there's an exception
+        sync_cleanup()
 
 if __name__ == "__main__":
     # For normal operation, run the main function
@@ -751,5 +853,5 @@ if __name__ == "__main__":
     #     })
     #     result = await handle_orchestration(context)
     #     print(result)
-    # 
+    #
     # asyncio.run(test_orchestrator())
