@@ -75,6 +75,17 @@ async def get_agent(tools: McpToolSpec):
     )
     return agent
 
+async def close_mcp_client():
+    """Close the MCP client connection to ensure proper cleanup."""
+    global mcp_client
+    if mcp_client:
+        logger.info("Closing MCP client connection...")
+        try:
+            await mcp_client.aclose()
+            logger.info("MCP client connection closed successfully")
+        except Exception as e:
+            logger.error(f"Error closing MCP client connection: {e}")
+
 async def generate_and_save_audio(text: str, agent: FunctionAgent, agent_context: Context, output_dir: str = "output/audio") -> dict:
     """
     Generate audio from text and save it locally.
@@ -88,6 +99,9 @@ async def generate_and_save_audio(text: str, agent: FunctionAgent, agent_context
     Returns:
         Dictionary with job info and local file path
     """
+    result = {"error": "Unknown error occurred"}
+    handler = None
+    
     try:
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
@@ -126,37 +140,73 @@ async def generate_and_save_audio(text: str, agent: FunctionAgent, agent_context
                                 timestamp = int(asyncio.get_event_loop().time())
                                 output_path = os.path.join(output_dir, f"audio_{timestamp}.mp3")
                                 shutil.copyfile(source_path, output_path)
-                                return {
+                                audio_saved = True
+                                result = {
                                     "success": True,
                                     "file_path": output_path
                                 }
+                                break  # Don't return early, let the finally block execute
                             else:
                                 logger.error(f"Resolved audio file does not exist at: {source_path}")
+                                logger.info(f"Checking if ELEVENLABS_PATH is set correctly: {elevenlabs_path}")
+                                logger.info(f"Checking if ELEVENLABS_OUTPUT_DIR is set correctly: {elevenlabs_output_dir}")
+                                logger.info(f"Full source path that doesn't exist: {source_path}")
                         else:
                             logger.error("Could not find audio URI in tool output content")
+                            logger.info(f"Content received: {event.tool_output.content}")
 
         
         if not audio_saved:
-            return {"error": "Failed to generate or save audio"}
+            logger.error("No audio was saved during the process")
+            result = {"error": "Failed to generate or save audio"}
         
     except Exception as e:
-        logger.error(f"Error in generate_and_save_audio: {str(e)}")
-        return {"error": str(e)}
+        error_msg = str(e)
+        logger.error(f"Error in generate_and_save_audio: {error_msg}")
+        
+        # Check for specific error types
+        if "quota_exceeded" in error_msg.lower():
+            result = {
+                "error": "quota_exceeded",
+                "message": error_msg
+            }
+        elif "too_many_concurrent_requests" in error_msg.lower():
+            result = {
+                "error": "too_many_concurrent_requests",
+                "message": error_msg
+            }
+        else:
+            result = {"error": error_msg}
+    finally:
+        # Clean up resources
+        if handler:
+            try:
+                await handler.aclose()
+                logger.info("Handler closed successfully")
+            except Exception as e:
+                logger.error(f"Error closing handler: {e}")
+        
+        return result
 
 async def main():
     # Get the agent
     agent = await get_agent(mcp_tool)
     agent_context = Context(agent)
 
-    # Test message
-    text = "Welcome to the multi-agent system demo"
-    result = await generate_and_save_audio(text, agent, agent_context)
-    
-    if "error" in result:
-        print(f"Error: {result['error']}")
-    else:
-        print(f"Audio generated successfully!")
-        print(f"File saved to: {result.get('file_path')}")
+    try:
+        # Test message
+        text = "Welcome to the multi-agent system demo"
+        result = await generate_and_save_audio(text, agent, agent_context)
+        
+        if "error" in result:
+            print(f"Error: {result['error']}")
+        else:
+            print(f"Audio generated successfully!")
+            print(f"File saved to: {result.get('file_path')}")
+    finally:
+        # Ensure MCP client is closed properly
+        await close_mcp_client()
+        print("Resources cleaned up")
 
 if __name__ == "__main__":
     asyncio.run(main())

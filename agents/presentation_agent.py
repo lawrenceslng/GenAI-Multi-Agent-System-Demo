@@ -10,6 +10,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 nest_asyncio.apply()
 
 from llama_index.core.agent import ReActAgent
+from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 from llama_index.tools.mcp import McpToolSpec, BasicMCPClient
@@ -23,6 +24,7 @@ class PresentationAgent:
     """Agent responsible for creating presentations from coding assignments using tool-calling."""
     
     def __init__(self, model_name: str = "gpt-4o"):
+    # def __init__(self, model_name: str = "gpt-4.1"):
         """Initialize basic attributes of the presentation agent."""
         self.model_name = model_name
         self.token_counter = None
@@ -71,6 +73,15 @@ class PresentationAgent:
                 verbose=True,
                 system_prompt=self._get_system_prompt()
             )
+            # Initialize agent
+            # self.agent = FunctionAgent(
+            #     name="PresentationAgent",
+            #     description="An agent that converts creates Google Slides presentations from coding assignments.",
+            #     tools=self.tools,
+            #     llm=self.llm,
+            #     verbose=True,
+            #     system_prompt=self._get_system_prompt()
+            # )
             
             # Create a tools dictionary for context
             self.tools_dict = {tool.name: tool for tool in self.tools}
