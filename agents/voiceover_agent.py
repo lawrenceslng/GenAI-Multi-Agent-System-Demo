@@ -126,22 +126,42 @@ async def generate_and_save_audio(text: str, agent: FunctionAgent, agent_context
                                 timestamp = int(asyncio.get_event_loop().time())
                                 output_path = os.path.join(output_dir, f"audio_{timestamp}.mp3")
                                 shutil.copyfile(source_path, output_path)
+                                audio_saved = True
                                 return {
                                     "success": True,
                                     "file_path": output_path
                                 }
                             else:
                                 logger.error(f"Resolved audio file does not exist at: {source_path}")
+                                logger.info(f"Checking if ELEVENLABS_PATH is set correctly: {elevenlabs_path}")
+                                logger.info(f"Checking if ELEVENLABS_OUTPUT_DIR is set correctly: {elevenlabs_output_dir}")
+                                logger.info(f"Full source path that doesn't exist: {source_path}")
                         else:
                             logger.error("Could not find audio URI in tool output content")
+                            logger.info(f"Content received: {event.tool_output.content}")
 
         
         if not audio_saved:
+            logger.error("No audio was saved during the process")
             return {"error": "Failed to generate or save audio"}
         
     except Exception as e:
-        logger.error(f"Error in generate_and_save_audio: {str(e)}")
-        return {"error": str(e)}
+        error_msg = str(e)
+        logger.error(f"Error in generate_and_save_audio: {error_msg}")
+        
+        # Check for specific error types
+        if "quota_exceeded" in error_msg.lower():
+            return {
+                "error": "quota_exceeded",
+                "message": error_msg
+            }
+        elif "too_many_concurrent_requests" in error_msg.lower():
+            return {
+                "error": "too_many_concurrent_requests",
+                "message": error_msg
+            }
+        
+        return {"error": error_msg}
 
 async def main():
     # Get the agent

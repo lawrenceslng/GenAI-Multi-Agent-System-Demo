@@ -12,6 +12,7 @@ import sys
 import json
 import argparse
 import re
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -25,7 +26,6 @@ from llama_index.core.workflow import Context
 
 # Import specialized agents
 from sandbox.docker_code_agent import get_code_agent
-from agents.documentation_agent import documentation_agent
 from agents.presentation_agent import get_presentation_agent
 from agents.voiceover_agent import mcp_tool, get_agent, generate_and_save_audio
 
@@ -97,6 +97,8 @@ class OrchestratorAgent:
                 - Come up with an original and interesting way to satisfy the requirements
                 - Make it specific enough that a coding agent can implement it
                 - Keep it realistic for the scope of the assignment
+                - ALWAYS include at least these three task types: "code", "presentation", and "voiceover"
+                  (The "code" task should have highest priority, followed by "presentation", then "voiceover")
                 
                 Ensure your response is valid JSON with these exact keys.
                 """
@@ -158,12 +160,10 @@ class OrchestratorAgent:
         if task_type == TaskType.CODE.value:
             return await get_code_agent()
         elif task_type == TaskType.VOICEOVER.value:
-            return await get_agent()
+            return await get_agent(mcp_tool)
         elif task_type == TaskType.PRESENTATION.value:
             return await get_presentation_agent()
-        agents = {
-            TaskType.DOCUMENTATION.value: documentation_agent,
-        }
+        agents = {}
         return agents.get(task_type)
 
     async def execute_task(self, task: Dict, context: Context) -> Dict:
@@ -183,6 +183,17 @@ class OrchestratorAgent:
         # Update context with task-specific information
         print("\nUpdating context with task information...")
         await context.set("task", task)
+        await context.set("agent", agent)
+        
+        # Create agent-specific context if needed
+        if task["type"] == TaskType.VOICEOVER.value:
+            try:
+                agent_context = await context.get("agent_context")
+            except ValueError:
+                # Initialize agent_context if it doesn't exist
+                agent_context = Context(agent)
+                await context.set("agent_context", agent_context)
+        
         print("✓ Context updated")
         
         try:
@@ -217,29 +228,83 @@ class OrchestratorAgent:
                         raise ValueError("Failed to parse code task result as JSON")
                 
                 # Create a script that explains the code and points out challenges and implementation details
+                # Find the most recent presentation task result
+                presentation_task_result = None
+                for completed_task in reversed(completed_tasks):
+                    if completed_task.get("task_type") == TaskType.PRESENTATION.value:
+                        presentation_task_result = completed_task
+                        break
+                
+                # Extract presentation information if available
+                presentation_info = ""
+                if presentation_task_result:
+                    presentation_result = presentation_task_result.get("result", {})
+                    if isinstance(presentation_result, str):
+                        try:
+                            presentation_result = json.loads(presentation_result)
+                        except json.JSONDecodeError:
+                            print("WARNING: Failed to parse presentation task result as JSON")
+                    
+                    if isinstance(presentation_result, dict):
+                        presentation_id = presentation_result.get("presentation_id", "Not available")
+                        presentation_info = f"Google Slides Presentation ID: {presentation_id}"
+                
                 script_prompt = f"""
-                Create a detailed script for a voiceover that explains the following code implementation:
+                Create a detailed script for a voiceover that explains the following code implementation and presentation:
                 
                 Project Requirements: {code_result.get('requirements', {})}
                 Files Generated: {code_result.get('files_generated', [])}
                 GitHub Repository: {code_result.get('github_repository', 'Not available')}
+                {presentation_info}
                 
                 The script should:
-                1. Explain the overall purpose and structure of the code
-                2. Point out interesting implementation details and design choices
-                3. Highlight any challenges that were addressed in the implementation
-                4. Discuss how the code satisfies the project requirements
+                1. Introduce the project and its purpose
+                2. Explain the overall structure and architecture of the code
+                3. Point out interesting implementation details and design choices
+                4. Highlight any challenges that were addressed in the implementation
+                5. Discuss how the code satisfies the project requirements
+                6. Mention that a presentation was created to visualize the project
+                7. Conclude with the value and potential applications of the project
                 
-                Make it engaging and informative for someone who wants to understand the code.
+                Make it engaging and informative for someone who wants to understand both the code and presentation.
+                The voiceover should be 1 minute long when spoken.
                 """
                 
                 script_response = await llm.acomplete(script_prompt)
                 script = script_response.text
                 
-                # Initialize the voiceover agent and generate audio
-                voiceover_agent_instance = await get_agent(mcp_tool)
-                agent_context = Context(voiceover_agent_instance)
-                result = await generate_and_save_audio(script, voiceover_agent_instance, agent_context)
+                # Get or create the agent context
+                try:
+                    agent_context = await context.get("agent_context")
+                except ValueError:
+                    print("Creating new agent context for voiceover task...")
+                    agent_context = Context(agent)
+                    await context.set("agent_context", agent_context)
+                
+                # Add retry logic for handling rate limits
+                max_retries = 3
+                retry_delay = 5  # seconds
+                
+                for attempt in range(max_retries):
+                    try:
+                        result = await generate_and_save_audio(script, agent, agent_context)
+                        if "error" not in result:
+                            break
+                        if "quota_exceeded" in str(result.get("error", "")).lower() or "too_many_concurrent_requests" in str(result.get("error", "")).lower():
+                            if attempt < max_retries - 1:
+                                print(f"Rate limit hit, waiting {retry_delay} seconds before retry {attempt + 1}/{max_retries}...")
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 2  # Exponential backoff
+                                continue
+                        break
+                    except Exception as e:
+                        if attempt < max_retries - 1:
+                            print(f"Error during attempt {attempt + 1}: {str(e)}")
+                            print(f"Retrying in {retry_delay} seconds...")
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2
+                        else:
+                            raise
             elif task["type"] == TaskType.PRESENTATION.value:
                 print("\n=== Starting Presentation Task ===")
                 print("Initializing presentation agent...")
@@ -386,7 +451,6 @@ class OrchestratorAgent:
         # Group tasks by type
         task_groups = {
             "code": [],
-            "documentation": [],
             "presentation": [],
             "voiceover": []
         }
@@ -395,8 +459,8 @@ class OrchestratorAgent:
             if task["type"] in task_groups:
                 task_groups[task["type"]].append(task)
 
-        # Execute tasks in order: code -> documentation -> presentation -> voiceover
-        execution_order = ["code", "documentation", "presentation", "voiceover"]
+        # Execute tasks in order: code -> presentation -> voiceover
+        execution_order = ["code", "presentation", "voiceover"]
         
         for task_type in execution_order:
             if task_groups[task_type]:
