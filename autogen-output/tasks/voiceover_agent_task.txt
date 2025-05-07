@@ -1,0 +1,15 @@
+Create voice-over scripts for the 'Study Helper Bot' presentation.
+
+Scripts should cover:
+- Intro Slide: Introduce the 'Study Helper Bot' and its goal (e.g., assisting students with learning).
+- Slide 1 (Purpose): Briefly narrate the purpose of the chatbot and its audience.
+- Slide 2 (Features/Use-cases): Describe the key functionalities, including answering questions, providing study tips, generating motivational messages, and study planning.
+- Slide 3 (Screenshots/Demo): Highlight the chatbot's deployment, its link, and its usability.
+- Slide 4 (Conclusion): Summarize the impact and usefulness of the chatbot.
+
+Guidelines:
+- Keep the narration concise and ensure total runtime fits into 5 minutes.
+- Maintain a clear and engaging tone.
+
+Deliverable:
+- A script for voice-over narration for the slide deck.

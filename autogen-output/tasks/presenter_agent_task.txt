@@ -1,0 +1,12 @@
+Create a slideshow presentation titled 'Study Helper Bot'.
+
+Slides to include:
+1. Title Slide: 'Study Helper Bot.'
+2. Slide 1: Purpose - Briefly explain the goal of the chatbot (e.g., assist students with learning and provide study support).
+3. Slide 2: Features/Use-cases - List the key functionalities, like answering questions, study tips, motivational messages, and study planning.
+4. Slide 3: Screenshots/Demo - Include screenshots of the bot in action and its deployment link.
+5. Slide 4: Conclusion - Summarize the bot's performance and impact.
+
+Deliverable:
+- An engaging presentation that follows the above slide format.
+- Ensure it is concise and fits within a 5-minute presentation duration.

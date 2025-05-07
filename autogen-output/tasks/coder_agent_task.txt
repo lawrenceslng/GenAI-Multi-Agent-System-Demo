@@ -1,0 +1,14 @@
+Implement a Chat Assistant called 'Study Helper Bot' using chatbot functionalities. This bot should:
+- Answer questions about various subjects (math, science, history, etc.).
+- Provide study tips and tricks.
+- Generate motivational messages for students.
+- Suggest basic study schedules/study plans.
+
+Functional Requirements:
+1. Host the chatbot live on Render.com.
+2. Once deployed, provide the live deployment link.
+3. Integrate the link into the Lab02 repo README file.
+
+Deliverable:
+- Deployed chatbot link on Render.com.
+- Code and description in a submission-ready Lab02 repo.

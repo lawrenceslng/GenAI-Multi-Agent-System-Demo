@@ -3,7 +3,7 @@ Deliverables due Thu Feb 13 8:00am
 
 You will to demonstrate your Chat Assitant in lecture on Thu Feb 13. You will have 5 minutes to give a quick overview and demo of your assistant in front of the class. Your code should be submitted to your lab02 repo.
 
-Your Chat Assistant should be live on Render.com. Please include a link to your site in your Lab02 repo READEM.
+Your Chat Assistant should be live on Render.com. Please include a link to your site in your Lab02 repo README.
 Requirements
 
 The real Hello World of GenAI is a Chat Assisant, like the OpenAI ChatGPT UI.

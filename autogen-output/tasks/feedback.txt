@@ -1,0 +1,1 @@
+Prompt team members repeatedly until responses are given to confirm understanding of tasks and share initial thoughts.
