@@ -15,14 +15,23 @@ Create a multi-agent system Proof-of-Concept (POC) that can:
 We chose to use coding project assignments to demonstrate this POC because:
 - assignment descriptions are available 
 
+This POC is a CLI program to keep things simple.
+
 ## Development Process
+
+The LLMs used are:
+- OpenAI 4o
+- OpenAI 4.1-nano
+- OpenAI 4o-mini
+
+Ollama models used for development but not "production".
 
 ### VERSION 1
 
 First, we focus on developing the individual agents:
 
 1. Coding Agent                                                 
-    - Launch Docker env       
+    - Launch Docker environment       
     - Write code based on project description
     - Upload to GitHub repository via [Github MCP Server](https://github.com/github/github-mcp-server)
 
@@ -35,14 +44,22 @@ First, we focus on developing the individual agents:
     - Generate script
     - Generate audio file via [ElevenLabs MCP Server](https://github.com/elevenlabs/elevenlabs-mcp)
 
+4. Documentation Agent (optional)
+    - Specifically designed to generate documentation from generated code output     
+
 We then follow the [LlamaIndex Multi-Agent example](https://docs.llamaindex.ai/en/stable/understanding/agent/multi_agent/) to combine the agents together in a workflow.
 
 This results in **VERSION 1** of the POC.
 
 #### What We Found
 
-- rigid architecture
-    - flow is too structured
+- rigid architecture; flow is too structured
+
+#### Demonstration
+
+- `orchestrator_merged.py` + `/sandbox`
+- [Github Repository](https://github.com/robot-coder?tab=repositories)
+- [Google Slides](https://drive.google.com/drive/home)
 
 ### VERSION 2
 
@@ -70,8 +87,18 @@ Also this would allow the agents to be more "creative" and not have to follow th
 5. What is the value of multi-agent system at this scale?
     - is it better to have 1 agent with a variety of function-calling/tool-use capabilities or separate into different agents?
 
+6. Prompt Engineering remains a challenge
 
 7. [Berkeley Function Calling Leaderboard](https://gorilla.cs.berkeley.edu/leaderboard.html)
 
 ## Next Steps
 - Try to look into combining sequential agents with round robin
+
+## Personal Takeaways on Generative AI Class as a whole
+Lawrence:
+- Coding assistants are a game changer for better and for worse
+    - quick iterations and MVPs are easy to churn out
+    - effort into prompt = better quality of code?
+    - may still struggle with particular codebases or integrations 
+    - money vs time
+- We've mostly touched on LLMs, but Voice AI is quickly becoming the next hot topic
