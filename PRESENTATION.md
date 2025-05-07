@@ -46,19 +46,32 @@ This results in **VERSION 1** of the POC.
 
 ### VERSION 2
 
+Tried to use Autogen. The idea was that a group chat would allow the presentation agent to gather thoughts/ideas from the other agents that they would use in the presentation.
+Also this would allow the agents to be more "creative" and not have to follow the more rigid structure/workflow from version 1.
 
+#### What We Found
 
+- rigid architecture might be necessary for predictability/reliability
+- Autogen architecture (or just any multiagent system) can quickly get overwhelming and difficult to manage
+- Really difficult to mix round robin chat with other types
+- It seemed like the only time it worked was the agent basically eventually learned the APIs on their own
+  
 
 ## Challenges and Lessons Learned
 1. Unofficial MCP servers may not work as well; we could edit the MCP server itself to make this work
     - Google Slides MCP Server unable to create Title Slide
     ![MCP Server unable to create slides](./assets/image.png)
     ![PREDEFINED_LAYOUT value incorrect](./assets/image-1.png)
+2. Rate limiting
+3. Bad documentation for a lot of MCP things and Autogen (two different versions)
 
-2. What is the value of multi-agent system at this scale?
+4. Seems to require human/subjective evaluation - can't really see any kind of automated benchmarks helping
+
+5. What is the value of multi-agent system at this scale?
     - is it better to have 1 agent with a variety of function-calling/tool-use capabilities or separate into different agents?
 
 
-3. [Berkeley Function Calling Leaderboard](https://gorilla.cs.berkeley.edu/leaderboard.html)
+7. [Berkeley Function Calling Leaderboard](https://gorilla.cs.berkeley.edu/leaderboard.html)
 
 ## Next Steps
+- Try to look into combining sequential agents with round robin
