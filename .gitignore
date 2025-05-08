@@ -4,3 +4,5 @@ env/
 .env
 archive
 token.json
+agent.log
+.venv
