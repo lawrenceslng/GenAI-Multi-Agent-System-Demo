@@ -36,11 +36,10 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 
-# Configuration
-DEFAULT_CONFIG_PATH = "config.json"
 DEFAULT_OUTPUT_DIR = "./output"
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_MODEL = "gpt-4o"
+repo_name = "project_1-autogen"
 
 # MCP API endpoints and scopes
 GITHUB_API_URL = "https://api.github.com"
@@ -56,38 +55,23 @@ ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1"
 class MCPClient:
     """Base class for MCP (Machine Communication Protocol) clients."""
     
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
+    def __init__(self):
         self.is_authenticated = False
         
     def authenticate(self) -> bool:
         """Authenticate with the MCP service."""
         raise NotImplementedError("Subclasses must implement authenticate()")
-    
-    def validate_config(self) -> bool:
-        """Validate that the configuration has the necessary parameters."""
-        raise NotImplementedError("Subclasses must implement validate_config()")
 
 
 class GitHubMCPClient(MCPClient):
     """Client for interacting with GitHub API."""
     
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self):
+        super().__init__()
         self.github = None
         self.repo = None
         
-    def validate_config(self) -> bool:
-        """Validate GitHub configuration."""
-        required_keys = ["repo_name", "username"]
-        return all(key in self.config for key in required_keys)
-        
     def authenticate(self) -> bool:
-        """Authenticate with GitHub."""
-        if not self.validate_config():
-            logger.error("Invalid GitHub configuration")
-            return False
-        
         try:
             self.github = Github(os.getenv("GITHUB_PAT"))
             user = self.github.get_user()
@@ -108,16 +92,15 @@ class GitHubMCPClient(MCPClient):
             user = self.github.get_user()
             try:
                 # Try to get existing repo
-                self.repo = user.get_repo(self.config["repo_name"])
-                logger.info(f"Found existing repository: {self.repo.full_name}")
+                self.repo = user.get_repo(repo_name)
+                logger.info(f"Found existing repository: {repo_name}")
             except github.GithubException:
                 # Create new repo if it doesn't exist
                 self.repo = user.create_repo(
-                    self.config["repo_name"],
-                    description=f"Auto-generated repository for {self.config['repo_name']}",
-                    private=self.config.get("private", True)
+                    repo_name,
+                    description=f"Auto-generated repository for {repo_name}"
                 )
-                logger.info(f"Created new repository: {self.repo.full_name}")
+                logger.info(f"Created new repository: {repo_name}")
             
             return self.repo
         except github.GithubException as e:
@@ -159,27 +142,17 @@ class GitHubMCPClient(MCPClient):
 class GoogleSlidesMCPClient(MCPClient):
     """Client for interacting with Google Slides API."""
     
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self):
+        super().__init__()
         self.credentials = None
         self.slides_service = None
         self.drive_service = None
         self.presentation_id = None
     
-    def validate_config(self) -> bool:
-        """Validate Google Slides configuration."""
-        required_keys = ["credentials_file", "token_file"]
-        return all(key in self.config for key in required_keys)
-    
     def authenticate(self) -> bool:
-        """Authenticate with Google Slides."""
-        if not self.validate_config():
-            logger.error("Invalid Google Slides configuration")
-            return False
-        
         try:
             creds = None
-            token_file = Path(self.config["token_file"])
+            token_file = Path("/home/erudman21/school/genai/GenAI-Multi-Agent-System-Demo/token.json")
             
             # Load credentials from token file if it exists
             if token_file.exists():
@@ -194,7 +167,7 @@ class GoogleSlidesMCPClient(MCPClient):
                     creds.refresh(Request())
                 else:
                     flow = InstalledAppFlow.from_client_secrets_file(
-                        self.config["credentials_file"], 
+                        "/home/erudman21/school/genai/GenAI-Multi-Agent-System-Demo/credentials.json", 
                         GOOGLE_SLIDES_SCOPES
                     )
                     creds = flow.run_local_server(port=0)
@@ -335,8 +308,8 @@ class GoogleSlidesMCPClient(MCPClient):
 class ElevenLabsMCPClient(MCPClient):
     """Client for interacting with ElevenLabs API."""
     
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self):
+        super().__init__()
         self.api_key = None
     
     def authenticate(self) -> bool:
@@ -378,15 +351,15 @@ class ElevenLabsMCPClient(MCPClient):
             
             data = {
                 "text": text,
-                "model_id": self.config.get("model_id", "eleven_monolingual_v1"),
+                "model_id": os.getenv("ELEVENLABS_MODEL_ID", "eleven_monolingual_v2"),
                 "voice_settings": {
-                    "stability": self.config.get("stability", 0.5),
-                    "similarity_boost": self.config.get("similarity_boost", 0.75)
+                    "stability": os.getenv("ELEVENLABS_STABILITY", 0.5),
+                    "similarity_boost": os.getenv("ELEVENLABS_SIMILARITY_BOOST", 0.75)
                 }
             }
             
             response = requests.post(
-                f"{ELEVENLABS_API_URL}/text-to-speech/{self.config['voice_id']}",
+                f"{ELEVENLABS_API_URL}/text-to-speech/{os.getenv('ELEVENLABS_VOICE_ID')}",
                 headers=headers,
                 json=data,
                 stream=True
@@ -496,18 +469,16 @@ class AssignmentParser:
 class MultiAgentSystem:
     """Main class for the multi-agent system."""
     
-    def __init__(self, config_path: str, output_dir: str):
-        self.config_path = config_path
+    def __init__(self, output_dir: str):
         self.output_dir = Path(output_dir)
-        self.config = self._load_config()
         
         # Create output directory if it doesn't exist
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize MCPs
-        self.github_mcp = GitHubMCPClient(self.config.get("github", {}))
-        self.slides_mcp = GoogleSlidesMCPClient(self.config.get("google_slides", {}))
-        self.elevenlabs_mcp = ElevenLabsMCPClient(self.config.get("elevenlabs", {}))
+        self.github_mcp = GitHubMCPClient()
+        self.slides_mcp = GoogleSlidesMCPClient()
+        self.elevenlabs_mcp = ElevenLabsMCPClient()
         
         # Initialize agents
         self.agents = {}
@@ -521,21 +492,11 @@ class MultiAgentSystem:
             "voice_over": False
         }
     
-    def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from file."""
-        try:
-            with open(self.config_path, 'r') as f:
-                config = json.load(f)
-            return config
-        except (json.JSONDecodeError, FileNotFoundError) as e:
-            logger.error(f"Error loading configuration: {e}")
-            return {}
-    
     def initialize_mcps(self) -> bool:
         """Initialize and authenticate all MCPs."""
-        github_auth = self.github_mcp.authenticate() if self.config.get("github") else False
-        slides_auth = self.slides_mcp.authenticate() if self.config.get("google_slides") else False
-        elevenlabs_auth = self.elevenlabs_mcp.authenticate() if self.config.get("elevenlabs") else False
+        github_auth = self.github_mcp.authenticate()
+        slides_auth = self.slides_mcp.authenticate()
+        elevenlabs_auth = self.elevenlabs_mcp.authenticate()
         
         # Log authentication status
         logger.info(f"GitHub MCP: {'Authenticated' if github_auth else 'Not authenticated or disabled'}")
@@ -695,7 +656,7 @@ class MultiAgentSystem:
         # Set up LLM configuration for agents with function schemas
         llm_config = {
             "config_list": [{
-                "model": self.config.get("model", DEFAULT_MODEL),
+                "model": "gpt-4o",
                 "api_key": os.environ.get("OPENAI_API_KEY"),
             }],
             "functions": function_schemas
@@ -704,7 +665,7 @@ class MultiAgentSystem:
         # Set up LLM configuration for GroupChatManager without functions
         manager_llm_config = {
             "config_list": [{
-                "model": self.config.get("model", DEFAULT_MODEL),
+                "model": "gpt-4o",
                 "api_key": os.environ.get("OPENAI_API_KEY"),
             }]
         }
@@ -818,7 +779,7 @@ class MultiAgentSystem:
         self.agents["user_proxy"] = UserProxyAgent(
             name="UserProxy",
             is_termination_msg=self.safer_termination_check,
-            human_input_mode="NEVER",
+            human_input_mode="TERMINATE",
             code_execution_config={
                 "work_dir": str(code_dir),
                 "use_docker": False
@@ -839,7 +800,7 @@ class MultiAgentSystem:
                 self.agents["user_proxy"]
             ],
             messages=[],
-            max_round=self.config.get("max_iterations", 15)
+            max_round=50
         )
         
         # Create a group chat manager with a configuration without functions
@@ -1134,7 +1095,6 @@ def main() -> None:
     """Main function to run the multi-agent system."""
     parser = argparse.ArgumentParser(description="Multi-Agent System for Assignment Completion")
     parser.add_argument("--assignment", required=True, help="Path to the assignment file")
-    parser.add_argument("--config", default=DEFAULT_CONFIG_PATH, help="Path to the configuration file")
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR, help="Directory to store output files")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     
@@ -1145,7 +1105,7 @@ def main() -> None:
         logger.setLevel(logging.DEBUG)
     
     # Create and run the multi-agent system
-    system = MultiAgentSystem(args.config, args.output_dir)
+    system = MultiAgentSystem(args.output_dir)
     system.run(args.assignment)
 
 
