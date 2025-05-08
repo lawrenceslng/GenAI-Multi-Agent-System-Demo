@@ -19,7 +19,7 @@ This POC is a CLI program to keep things simple.
 
 ## Development Process
 
-The LLMs used are:
+The LLMs we experimented with:
 - OpenAI 4o
 - OpenAI 4.1-nano
 - OpenAI 4o-mini
@@ -60,6 +60,7 @@ This results in **VERSION 1** of the POC.
 - `orchestrator_merged.py` + `/sandbox`
 - [Github Repository](https://github.com/robot-coder?tab=repositories)
 - [Google Slides](https://drive.google.com/drive/home)
+- audio file: `output/audio/audio_942938.mp3`
 
 ### VERSION 2
 
@@ -73,6 +74,11 @@ Also this would allow the agents to be more "creative" and not have to follow th
 - Really difficult to mix round robin chat with other types
 - It seemed like the only time it worked was the agent basically eventually learned the APIs on their own
   
+## Discussion Points
+
+- FunctionAgent vs ReActAgent
+- [MCP Run Python by Pydantic](https://ai.pydantic.dev/mcp/run-python/) vs Docker for development
+- MCP Servers vs API Integration
 
 ## Challenges and Lessons Learned
 1. Unofficial MCP servers may not work as well; we could edit the MCP server itself to make this work
@@ -93,6 +99,7 @@ Also this would allow the agents to be more "creative" and not have to follow th
 
 ## Next Steps
 - Try to look into combining sequential agents with round robin
+- Have presentation and audio file play in sync
 
 ## Personal Takeaways on Generative AI Class as a whole
 Lawrence:
