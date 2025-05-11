@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Assistant</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: scroll; }
+        #user-input { width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>Chat Assistant</h1>
+    <div id="chat"></div>
+    <input type="text" id="user-input" placeholder="Type your message..." />
+    <button id="send">Send</button>
+
+    <script>
+        let messages = [];
+
+        function updateChat() {
+            $('#chat').empty();
+            messages.forEach(msg => {
+                $('#chat').append('<div>' + msg + '</div>');
+            });
+        }
+
+        $('#send').click(function() {
+            const userInput = $('#user-input').val();
+            messages.push('User: ' + userInput);
+            updateChat();
+            $('#user-input').val('');
+
+            // Send message to server
+            $.post('/send', { message: userInput }, function(response) {
+                messages.push('Assistant: ' + response);
+                updateChat();
+            });
+        });
+    </script>
+</body>
+</html>

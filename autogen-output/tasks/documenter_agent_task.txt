@@ -1,0 +1,14 @@
+Prepare documentation for the 'Study Helper Bot.'
+
+Tasks:
+1. Write a README file for the Lab02 repository. The README should include:
+   - A description of the chatbot (Study Helper Bot).
+   - Features and functionalities (e.g., answering subject-based questions, study tips, motivational messages, and study plans).
+   - A deployment link to the bot hosted on Render.com.
+   - Usage instructions (how users can interact with the bot).
+
+2. Organize the repository structure for submission (include all essential files).
+
+Deliverable:
+- A well-documented README file.
+- A structured repository ready for submission.
