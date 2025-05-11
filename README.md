@@ -93,6 +93,12 @@ multi_agent_homework/
    - Enhanced natural language processing
    - Improved task understanding and delegation
 
+## Demo 
+
+The following link shows how **Version 1** of this multi-agent system works. The command `python orchestrator_merged.py --assignment project_3.txt` is run, and it kicks off all the necessary agents to complete the task one by one in order. The Github Repository, Google Slides (minus Title Slide), and the voiceover recording are all generated automatically.
+
+[Version 1 Demo Video](https://youtu.be/U3R9durFHp4)
+
 ## Contributing
 
 1. Fork the repository
