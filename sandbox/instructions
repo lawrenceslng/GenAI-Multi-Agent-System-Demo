@@ -19,7 +19,7 @@ Another option to build out a multi-agent system.
 Be creative.
 
 CREATIVE IMPLEMENTATION IDEA:
-Develop a multi-functional agent that uses custom Python tools to scrape news websites, filter articles based on relevance and popularity, and then utilize an MCP server with Playwright to automate browser interactions for dynamic content extraction. The agent then summarizes the curated articles and compiles a personalized daily newsletter.
+Develop a multi-agent system where one agent gathers and processes data from web sources using MCP Playwright, another agent summarizes the information with custom Python functions (e.g., text extraction, keyword analysis, and summarization), and a final agent compiles the summarized content into a dynamic presentation. The system leverages LlamaIndex to connect these tools seamlessly, enabling the agents to collaborate and produce a comprehensive, automated research report with visual slides and an audio narration.
 
 WHY THIS IS INTERESTING:
-This approach combines web scraping, data filtering, and browser automation to solve a real-world problem—automated content curation—demonstrating multi-agent collaboration and advanced tool integration. It showcases how AI can assist in information overload scenarios, making it both practical and innovative.
+This approach combines multiple advanced components—web automation, data processing, and presentation generation—demonstrating a sophisticated, end-to-end AI workflow. It showcases how agents can work together to solve complex tasks, making it a compelling example of multi-agent systems in action, with practical applications like automated research assistants or educational content creators.
