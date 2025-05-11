@@ -1,14 +1,9 @@
 import os
 import argparse
-import json
-import re
 import logging
-import time
-from typing import Dict, List, Any, Optional, Sequence
 from pathlib import Path
 
-from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
-from autogen_agentchat.messages import BaseAgentEvent, BaseChatMessage
+from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.teams import SelectorGroupChat
 from autogen_agentchat.ui import Console
 from autogen_ext.models.openai import OpenAIChatCompletionClient
@@ -16,16 +11,6 @@ from autogen_agentchat.conditions import TextMentionTermination
 from autogen_core.tools import FunctionTool
 
 from dotenv import load_dotenv
-
-# MCP Client Libraries
-import requests
-import github
-from github import Github
-from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-import google.auth.exceptions
 
 # Add MCP related imports
 from autogen_ext.tools.mcp import McpWorkbench, StdioServerParams
@@ -562,12 +547,6 @@ class MultiAgentSystem:
             
             assignment_parser_agent = self.assignment_parser.get_agent()
             
-            # def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str | None:
-            #     if messages[-1].source != planning_agent.name:
-            #         return planning_agent.name
-            #     return None
-            
-            # Create a SelectorGroupChat with all agents
             self.group_chat = SelectorGroupChat(
                 [
                     planning_agent,
@@ -577,13 +556,11 @@ class MultiAgentSystem:
                     voice_over_agent,
                     assignment_parser_agent,
                     presentation_verifier_agent
-                    # file_writer_agent
                 ],
                 model_client=model_client,
                 termination_condition=TextMentionTermination("TERMINATE"),
                 selector_prompt=selector_prompt,
                 allow_repeated_speaker=True,
-                # selector_func=selector_func
             )
             
             logger.info(f"SelectorGroupChat created with {len(self.group_chat._participants)} agents")
