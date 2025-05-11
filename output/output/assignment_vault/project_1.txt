@@ -1,0 +1,46 @@
+# Project 1: Implementing a Chat Assistant
+
+## Overview
+This project involves creating a Chat Assistant that mimics the functionality of ChatGPT. The assistant will be developed using a front-end JavaScript interface and a back-end Python FastAPI server. The project will be deployed on Render.com and will include features such as continuous conversation, file uploads, and LLM selection.
+
+## Tasks
+1. **Front-End Development**:
+   - Develop a front-end JavaScript interface using Aider or Roo Code.
+   - Ensure the UI displays the conversation similar to ChatGPT.
+
+2. **Back-End Development**:
+   - Develop a back-end Python FastAPI server using Aider or Roo Code.
+   - Implement LiteLLM to make calls to the selected LLM.
+   - Allow the user to choose an LLM.
+   - Implement a continuous conversation feature.
+
+3. **Deployment**:
+   - Deploy the Chat Assistant on Render.com.
+   - Create a new OpenRouter.ai API Key with a limit, like $3.00.
+
+4. **Extensions**:
+   - Implement text file uploads to add to the prompt context.
+   - Implement image file uploads for multimodal LLMs.
+   - Implement side-by-side LLM response comparison of two models.
+
+5. **Documentation**:
+   - Document the code and provide a README with a link to the deployed site.
+
+6. **Presentation**:
+   - Create a presentation for the demonstration in class.
+
+7. **Voice-Over**:
+   - Create a voice-over for the presentation.
+
+## Deliverables
+- A working Chat Assistant deployed on Render.com.
+- Code submitted to your lab02 repo.
+- A link to your deployed site included in your Lab02 repo README.
+
+## Due Date
+- Thu Feb 13, 8:00 AM
+
+## Extensions
+- Allow for text file uploads to add to the prompt context.
+- Allow for image file uploads to send to multimodal LLMs.
+- Allow for side-by-side LLM response comparison of two models.
