@@ -173,6 +173,7 @@ We also tried to use autogen and give the agents more autonomy. It worked to som
 python local_autogen/main.py --assignment assignment_vault/project_1.txt
 ```
 Demo:
+
 https://github.com/user-attachments/assets/9eea8c87-ef5c-4a19-ab64-f8a35433a2f0
 
 
