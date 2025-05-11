@@ -173,7 +173,9 @@ We also tried to use autogen and give the agents more autonomy. It worked to som
 python local_autogen/main.py --assignment assignment_vault/project_1.txt
 ```
 Demo:
-[](./readme_recordings/autogen_demo.mp4)
+
+https://github.com/user-attachments/assets/9eea8c87-ef5c-4a19-ab64-f8a35433a2f0
+
 
 ## Future Enhancements
 
