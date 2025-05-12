@@ -1,0 +1,29 @@
+{
+  "main_objective": "Create an engaging, themed chat assistant that allows users to explore a specific topic interactively, with multi-modal capabilities and model comparisons, deployed on Render.com.",
+  "creative_idea": {
+    "summary": "Develop a 'Historical Time Travel Guide' chat assistant that immerses users in different historical eras. Users can chat with AI personas from specific periods, upload images or texts related to history, and compare responses from multiple LLMs side-by-side to evaluate accuracy and style.",
+    "why_interesting": "This approach transforms a standard chat assistant into an educational and interactive experience, leveraging multimodal inputs and model comparisons to deepen engagement. It offers a unique, themed exploration that appeals to learners and history enthusiasts, making the project both fun and informative."
+  },
+  "required_tasks": [
+    {
+      "type": "code",
+      "description": "Implement the front-end UI with a themed design (e.g., vintage parchment style) that supports chat, file uploads, and side-by-side model comparison. Develop the FastAPI backend to handle conversation state, multimodal inputs, and LLM calls via LiteLLM. Integrate model selection and response display.",
+      "priority": 1
+    },
+    {
+      "type": "code",
+      "description": "Configure deployment on Render.com, ensuring the app is publicly accessible, with environment variables for API keys, and proper handling of file uploads and model switching.",
+      "priority": 2
+    },
+    {
+      "type": "presentation",
+      "description": "Prepare a 5-minute demo showcasing the themed chat experience, multimodal features, and model comparison, highlighting how the assistant immerses users in history and demonstrates the technical features.",
+      "priority": 3
+    },
+    {
+      "type": "voiceover",
+      "description": "Create a brief narration explaining the concept, features, and educational value of the assistant, to accompany the demo or as part of the presentation slides.",
+      "priority": 4
+    }
+  ]
+}

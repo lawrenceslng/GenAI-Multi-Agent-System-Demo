@@ -1,0 +1,29 @@
+{
+  "main_objective": "Create an engaging, themed chat assistant that provides personalized storytelling and interactive experiences, demonstrating seamless conversation flow and multimodal capabilities.",
+  "creative_idea": {
+    "summary": "Develop a 'Storytelling Companion' chat assistant themed around classic fairy tales. Users can chat with the assistant to craft, modify, and explore stories, upload images to visualize characters or scenes, and compare responses from different LLMs side-by-side. The UI will feature a dynamic, story-centric interface with options to upload files, select LLMs, and view responses in a conversational format, all hosted on Render.com.",
+    "why_interesting": "This approach transforms a standard chat assistant into an immersive storytelling tool, making the experience more engaging and personalized. Incorporating multimodal uploads and model comparisons adds depth and interactivity, showcasing advanced capabilities while aligning with the assignment's creative extension options."
+  },
+  "required_tasks": [
+    {
+      "type": "code",
+      "description": "Implement the front-end UI using JavaScript that displays a chat window, allows LLM selection, and supports file uploads for images and text. Develop the FastAPI backend in Python to handle conversation state, call LiteLLM, and process uploads. Integrate multimodal support for images to generate story visuals. Enable side-by-side comparison of two LLM responses within the UI.",
+      "priority": 1
+    },
+    {
+      "type": "documentation",
+      "description": "Create a README detailing setup instructions, deployment steps on Render.com, API key management, and how to use the themed storytelling features, including file uploads and model comparisons.",
+      "priority": 2
+    },
+    {
+      "type": "presentation",
+      "description": "Prepare a 5-minute demo showcasing the chat assistant's storytelling capabilities, multimodal features, and model comparison, emphasizing the creative theme and user experience.",
+      "priority": 3
+    },
+    {
+      "type": "voiceover",
+      "description": "Record a brief voiceover explaining the design choices, features, and potential extensions of the storytelling assistant during the demo.",
+      "priority": 4
+    }
+  ]
+}
