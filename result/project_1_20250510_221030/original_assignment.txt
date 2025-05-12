@@ -1,0 +1,37 @@
+Implementing a Chat Assistant (10%)
+Deliverables due Thu Feb 13 8:00am
+
+You will to demonstrate your Chat Assitant in lecture on Thu Feb 13. You will have 5 minutes to give a quick overview and demo of your assistant in front of the class. Your code should be submitted to your lab02 repo.
+
+Your Chat Assistant should be live on Render.com. Please include a link to your site in your Lab02 repo README.
+Requirements
+
+The real Hello World of GenAI is a Chat Assisant, like the OpenAI ChatGPT UI.
+
+https://chatgpt.com/
+
+Everyone is doing it, so we will to with the help of Aider and Roo Code.
+
+First, while I love Aider, Roo Code is also quite amazing:
+
+https://github.com/RooVetGit/Roo-Code
+
+This is a VS Code extension that give you Aider-like coding assistance.
+
+Here are the broad strokes of what you should do:
+
+    Use Aider or Roo Code to develop a front-end Javascript interface.
+    Use Aider or Roo Code to develop a back-end Python FastAPI server.
+    The Python server should use LiteLLM to make calls to the selected LLM.
+    Allow the user to choose and LLM.
+    You should allow for a continuous conversation in which you add each LLM response to a message array that the UI sends to the server on each new user prompt.
+    The UI should show the conversation similar to ChatGPT.
+    You can deploy your Chat Assistant to https://render.com/ for free.
+    Since we will make the Chat Assistant publically available, you can create a new OpenRouter.ai API Key with a limit, like $3.00.
+    Be creative and make your Chat Assistant specfic to a particular theme or topic.
+
+Extensions
+
+    Allow for text file uploads to add to the prompt context.
+    Allow for image file uploads to send to multimodal LLMs.
+    Allow for side-by-side LLM response comparison of two models.
